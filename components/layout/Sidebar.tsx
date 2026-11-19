@@ -2,13 +2,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, BookOpen, BarChart2, Calendar, Settings, TrendingUp, Zap, CandlestickChart, Link2 } from 'lucide-react'
+import { LayoutDashboard, BookOpen, BarChart2, Calendar, Settings, TrendingUp, Zap, CandlestickChart, Link2, ScanLine, Radio, Calculator } from 'lucide-react'
 import { useTradingStore } from '@/store/tradingStore'
 import { computeAnalytics } from '@/lib/analytics'
 
 const nav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/market', label: 'Marchés', icon: CandlestickChart },
+  { href: '/scanner', label: 'Scanner', icon: ScanLine },
+  { href: '/signals', label: 'Signaux', icon: Radio },
+  { href: '/planner', label: 'Trade Plan', icon: Calculator },
   { href: '/broker', label: 'Broker', icon: Link2 },
   { href: '/journal', label: 'Journal', icon: BookOpen },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },

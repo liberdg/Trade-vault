@@ -23,11 +23,6 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
   selectedTrade: null,
 
   loadAll: async () => {
-    // Seed demo data on first launch (client-side only)
-    if (typeof window !== 'undefined') {
-      const { seedDemoData } = await import('@/lib/seedData')
-      await seedDemoData()
-    }
     const [trades, settings] = await Promise.all([
       db.trades.orderBy('entryDate').reverse().toArray(),
       getSettings(),

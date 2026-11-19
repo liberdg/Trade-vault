@@ -10,7 +10,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const loadAll = useTradingStore(s => s.loadAll)
 
   useEffect(() => {
-    import('@/lib/seedData').then(m => m.seedDemoData()).then(() => loadAll())
+    loadAll()
   }, [loadAll])
 
   return (

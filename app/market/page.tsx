@@ -8,6 +8,7 @@ import {
   MarketCandlesResult,
   MarketKind,
 } from '@/lib/market'
+import { analyzeCandles, MarketAnalysis } from '@/lib/smrt-analysis'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,9 +96,11 @@ export default async function MarketPage({ searchParams }: Props) {
     : '1d'
 
   let data: MarketCandlesResult | null = null
+  let analysis: MarketAnalysis | null = null
   let error = ''
   try {
     data = await loadMarket(selected.symbol, selected.kind as MarketKind, interval)
+    if (data) analysis = analyzeCandles(data.candles)
   } catch (err) {
     error = err instanceof Error ? err.message : 'Market provider unavailable'
   }
@@ -166,7 +169,28 @@ export default async function MarketPage({ searchParams }: Props) {
             </div>
           )}
           {data && (
-            <RealMarketChart candles={data.candles} provider={data.provider} status={data.status} retrievedAt={data.retrievedAt} />
+            <RealMarketChart candles={data.candles} provider={data.provider} status={data.status} retrievedAt={data.retrievedAt} analysis={analysis ?? undefined} />
+          )}
+          {analysis && (
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <div className="text-[10px] font-mono uppercase text-muted">Bias / Structure</div>
+                <div className="mt-2 font-mono text-sm font-bold text-white">{analysis.bias} · {analysis.structure}</div>
+                <div className="mt-2 text-xs text-muted">{analysis.explanation}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <div className="text-[10px] font-mono uppercase text-muted">Confluences</div>
+                <div className="mt-2 space-y-1">
+                  {analysis.confluences.map(item => <div key={item} className="text-xs text-bull">• {item}</div>)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <div className="text-[10px] font-mono uppercase text-muted">Missing / Invalidation</div>
+                <div className="mt-2 space-y-1">
+                  {analysis.missing.map(item => <div key={item} className="text-xs text-gold">• {item}</div>)}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

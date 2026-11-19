@@ -2,15 +2,17 @@
 
 import { format } from 'date-fns'
 import type { Candle } from '@/lib/market'
+import type { MarketAnalysis } from '@/lib/smrt-analysis'
 
 interface Props {
   candles: Candle[]
   provider: string
   status: string
   retrievedAt: string
+  analysis?: MarketAnalysis
 }
 
-export function RealMarketChart({ candles, provider, status, retrievedAt }: Props) {
+export function RealMarketChart({ candles, provider, status, retrievedAt, analysis }: Props) {
   if (candles.length === 0) {
     return <div className="flex h-96 items-center justify-center text-sm font-mono text-muted">Aucune bougie retournée par le fournisseur.</div>
   }
@@ -62,6 +64,46 @@ export function RealMarketChart({ candles, provider, status, retrievedAt }: Prop
               </g>
             )
           })}
+
+          {analysis?.zones.map((zone, index) => {
+            const startIndex = visible.findIndex(candle => candle.time >= zone.startTime)
+            const endIndex = visible.findIndex(candle => candle.time >= zone.endTime)
+            if (startIndex < 0) return null
+            const x = Math.max(0, startIndex * step)
+            const width = Math.max(step * 2, ((endIndex < 0 ? visible.length - 1 : endIndex) - startIndex) * step)
+            const zoneTop = y(Math.max(zone.top, zone.bottom))
+            const zoneBottom = y(Math.min(zone.top, zone.bottom))
+            const bullish = zone.kind === 'BULLISH_OB' || zone.kind === 'BULLISH_FVG'
+            return (
+              <g key={`${zone.kind}-${zone.startTime}-${index}`}>
+                <rect x={x} y={zoneTop} width={width} height={Math.max(2, zoneBottom - zoneTop)}
+                  fill={bullish ? '#00ff88' : '#ff3355'} opacity="0.12" stroke={bullish ? '#00ff88' : '#ff3355'} strokeOpacity="0.5" />
+                <text x={x + 4} y={zoneTop + 11} fill={bullish ? '#00ff88' : '#ff3355'} fontSize="9" fontFamily="JetBrains Mono">
+                  {zone.kind.replace('_', ' ')}
+                </text>
+              </g>
+            )
+          })}
+
+          {analysis?.entryZone && (
+            <g>
+              <rect x="0" y={y(analysis.entryZone.top)} width="920" height={Math.max(2, y(analysis.entryZone.bottom) - y(analysis.entryZone.top))}
+                fill="#00d4ff" opacity="0.08" stroke="#00d4ff" strokeOpacity="0.7" strokeDasharray="6 4" />
+              <text x="8" y={y(analysis.entryZone.top) - 6} fill="#00d4ff" fontSize="10" fontFamily="JetBrains Mono">ENTRY ZONE</text>
+            </g>
+          )}
+          {analysis?.stopLoss !== null && analysis?.stopLoss !== undefined && (
+            <g>
+              <line x1="0" x2="920" y1={y(analysis.stopLoss)} y2={y(analysis.stopLoss)} stroke="#ff3355" strokeWidth="1" strokeDasharray="8 5" />
+              <text x="824" y={y(analysis.stopLoss) - 5} fill="#ff3355" fontSize="9" fontFamily="JetBrains Mono">SL</text>
+            </g>
+          )}
+          {analysis?.takeProfits.map((price, index) => (
+            <g key={price}>
+              <line x1="0" x2="920" y1={y(price)} y2={y(price)} stroke="#00ff88" strokeWidth="1" strokeDasharray="5 5" />
+              <text x="824" y={y(price) - 5} fill="#00ff88" fontSize="9" fontFamily="JetBrains Mono">TP{index + 1}</text>
+            </g>
+          ))}
 
           {allOpenEqualsClose ? (
             <polyline
