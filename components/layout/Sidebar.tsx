@@ -2,12 +2,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, BookOpen, BarChart2, Calendar, Settings, TrendingUp, Zap } from 'lucide-react'
+import { LayoutDashboard, BookOpen, BarChart2, Calendar, Settings, TrendingUp, Zap, CandlestickChart, Link2 } from 'lucide-react'
 import { useTradingStore } from '@/store/tradingStore'
 import { computeAnalytics } from '@/lib/analytics'
 
 const nav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/market', label: 'Marchés', icon: CandlestickChart },
+  { href: '/broker', label: 'Broker', icon: Link2 },
   { href: '/journal', label: 'Journal', icon: BookOpen },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/calendar', label: 'Calendrier', icon: Calendar },
@@ -28,7 +30,7 @@ export function Sidebar() {
             <Zap className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <div className="font-display text-2xl text-accent tracking-wider">TRADEVAULT</div>
+            <div className="font-display text-2xl text-accent tracking-wider">SMRT</div>
             <div className="text-xs text-muted font-mono">{settings.displayName}</div>
           </div>
         </div>

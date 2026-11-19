@@ -1,0 +1,108 @@
+'use client'
+
+import { useState } from 'react'
+import { AlertTriangle, CheckCircle2, Send } from 'lucide-react'
+
+interface Props {
+  connected: boolean
+  environment: 'practice' | 'live'
+  liveExecutionEnabled: boolean
+}
+
+export function BrokerOrderForm({ connected, environment, liveExecutionEnabled }: Props) {
+  const [instrument, setInstrument] = useState('EUR_USD')
+  const [units, setUnits] = useState('')
+  const [stopLoss, setStopLoss] = useState('')
+  const [takeProfit, setTakeProfit] = useState('')
+  const [confirmLive, setConfirmLive] = useState(false)
+  const [orderResult, setOrderResult] = useState('')
+  const [orderError, setOrderError] = useState('')
+
+  const submitOrder = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setOrderError('')
+    setOrderResult('')
+
+    if (!connected) {
+      setOrderError('Le compte broker n’est pas connecté.')
+      return
+    }
+    if (environment === 'live' && (!liveExecutionEnabled || !confirmLive)) {
+      setOrderError('Une confirmation explicite est requise pour tout ordre live.')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/broker/oanda/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instrument,
+          units: Number(units),
+          stopLossDistance: stopLoss ? Number(stopLoss) : undefined,
+          takeProfitDistance: takeProfit ? Number(takeProfit) : undefined,
+          confirmLive,
+        }),
+      })
+      const json = await response.json()
+      if (!response.ok) throw new Error(json.error || 'OANDA rejected the order')
+      setOrderResult(`Ordre accepté dans l’environnement ${json.environment}.`)
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : 'Order submission failed')
+    }
+  }
+
+  return (
+    <form onSubmit={submitOrder} className="rounded-2xl border border-border bg-panel p-5">
+      <div className="mb-5 flex items-center gap-2">
+        <Send className="h-4 w-4 text-accent" />
+        <h2 className="font-display text-xl tracking-wide text-white">PLANIFIER UN ORDRE</h2>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Field label="Instrument">
+          <input value={instrument} onChange={event => setInstrument(event.target.value.toUpperCase())} placeholder="EUR_USD" className="market-input" />
+        </Field>
+        <Field label="Unités (+ achat / - vente)">
+          <input type="number" value={units} onChange={event => setUnits(event.target.value)} placeholder="1000" className="market-input" />
+        </Field>
+        <Field label="Stop Loss (distance prix)">
+          <input type="number" step="any" value={stopLoss} onChange={event => setStopLoss(event.target.value)} placeholder="0.0020" className="market-input" />
+        </Field>
+        <Field label="Take Profit (distance prix)">
+          <input type="number" step="any" value={takeProfit} onChange={event => setTakeProfit(event.target.value)} placeholder="0.0040" className="market-input" />
+        </Field>
+      </div>
+
+      {environment === 'live' && (
+        <label className="mt-4 flex items-center gap-3 rounded-lg border border-bear/30 bg-bear-dim px-4 py-3 text-sm text-white">
+          <input type="checkbox" checked={confirmLive} onChange={event => setConfirmLive(event.target.checked)} className="accent-bear" />
+          Je confirme l’envoi d’un ordre réel sur le compte live.
+        </label>
+      )}
+
+      {orderError && (
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-bear/20 bg-bear-dim px-4 py-3 text-sm text-bear">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {orderError}
+        </div>
+      )}
+      {orderResult && (
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-bull/20 bg-bull-dim px-4 py-3 text-sm text-bull">
+          <CheckCircle2 className="h-4 w-4" /> {orderResult}
+        </div>
+      )}
+
+      <button type="submit" disabled={!connected} className="mt-5 rounded-lg bg-accent px-5 py-3 font-mono text-sm font-bold text-void disabled:cursor-not-allowed disabled:opacity-40">
+        {environment === 'live' ? 'Soumettre l’ordre live' : 'Soumettre l’ordre practice'}
+      </button>
+    </form>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-mono uppercase text-muted">{label}</span>
+      {children}
+    </label>
+  )
+}

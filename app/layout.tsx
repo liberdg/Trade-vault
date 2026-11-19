@@ -3,8 +3,8 @@ import './globals.css'
 import { AppShell } from '@/components/layout/AppShell'
 
 export const metadata: Metadata = {
-  title: 'TradeVault — Journal de Trading',
-  description: 'Votre machine d\'analyse de trading personnelle',
+  title: 'SMRT Trading Analytics',
+  description: 'Market intelligence and trading analytics',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

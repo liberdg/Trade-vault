@@ -130,6 +130,15 @@ L'application analyse tes trades locaux avec des heuristiques déterministes et 
 
 > Les données de démonstration sont explicitement marquées comme exemples locaux. Aucun cours de marché, signal IA, statut de connexion ou performance broker n'est fabriqué.
 
+## Marchés réels et broker
+
+- **Crypto**: Binance public market-data endpoints (`/api/v3/klines`) with no API key. The server falls back to Yahoo Finance chart data if Binance is unavailable.
+- **Forex**: Yahoo Finance chart endpoint first, then Frankfurter ECB reference rates as a daily close-only fallback.
+- **Indices/stocks**: Yahoo Finance chart endpoint.
+- **Broker**: OANDA v20 practice/live accounts. Configure server-only variables from `.env.example`. Live order execution requires `OANDA_ALLOW_LIVE=true`, `OANDA_ENVIRONMENT=live`, and explicit confirmation in the UI.
+
+All provider failures are returned as unavailable states. The app never converts missing provider data into fabricated candles or connection status.
+
 ## 🔮 Évolutivité (SaaS-ready)
 
 Pour ajouter l'authentification future :
