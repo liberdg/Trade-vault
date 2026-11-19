@@ -119,14 +119,16 @@ Paramètres utilisateur : capital, devise, stratégies, objectifs, tags.
 - Export/Import JSON
 - Reset des données
 
-## 🧠 Insights IA (simulés localement)
+## 🧠 Insights locaux
 
-L'application analyse tes trades et génère automatiquement :
+L'application analyse tes trades locaux avec des heuristiques déterministes et génère automatiquement :
 - Détection des heures non-rentables
 - Analyse émotions → win rate
 - Détection de trading revanche
 - Meilleurs actifs et jours de la semaine
 - Alertes patterns négatifs
+
+> Les données de démonstration sont explicitement marquées comme exemples locaux. Aucun cours de marché, signal IA, statut de connexion ou performance broker n'est fabriqué.
 
 ## 🔮 Évolutivité (SaaS-ready)
 

@@ -3,6 +3,7 @@ export type TradeDirection = 'BUY' | 'SELL'
 export type TradeStatus = 'OPEN' | 'CLOSED' | 'CANCELLED'
 export type EmotionTag = 'confident' | 'fearful' | 'greedy' | 'revenge' | 'calm' | 'anxious' | 'fomo' | 'disciplined' | 'impulsive' | 'patient'
 export type SessionType = 'London' | 'New York' | 'Asia' | 'Pre-Market' | 'After-Hours'
+export type TradeSource = 'demo' | 'manual' | 'imported' | 'broker'
 
 export interface TradeImage {
   id: string
@@ -22,6 +23,7 @@ export interface Trade {
   assetClass: AssetClass
   direction: TradeDirection
   status: TradeStatus
+  source?: TradeSource
   
   // Timing
   entryDate: string

@@ -38,6 +38,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
   addTrade: async (tradeData) => {
     const trade: Trade = {
       ...tradeData,
+      source: tradeData.source ?? 'manual',
       id: uuidv4(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

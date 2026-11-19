@@ -5,7 +5,7 @@ import { Save, Plus, Trash2, Download, Upload, RotateCcw } from 'lucide-react'
 import { useTradingStore } from '@/store/tradingStore'
 import { db } from '@/lib/db'
 import toast from 'react-hot-toast'
-import type { Strategy, Goal } from '@/types'
+import type { Strategy, Goal, Trade } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 
 const STRATEGY_COLORS = ['#00d4ff', '#00ff88', '#ffd700', '#ff3355', '#ff8800', '#aa44ff', '#ff66aa', '#44ffbb']
@@ -70,8 +70,12 @@ export default function SettingsPage() {
     try {
       const data = JSON.parse(text)
       if (data.trades) {
-        await db.trades.bulkPut(data.trades)
-        toast.success(`${data.trades.length} trades importés ✓`)
+        const importedTrades = data.trades.map((trade: Trade) => ({
+          ...trade,
+          source: trade.source ?? 'imported',
+        }))
+        await db.trades.bulkPut(importedTrades)
+        toast.success(`${importedTrades.length} trades importés ✓`)
         window.location.reload()
       }
     } catch { toast.error('Fichier invalide') }

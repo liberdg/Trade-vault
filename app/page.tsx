@@ -7,6 +7,7 @@ import { computeAnalytics, generateInsights } from '@/lib/analytics'
 import { StatCard } from '@/components/ui/StatCard'
 import { EquityCurve } from '@/components/dashboard/EquityCurve'
 import { RecentTrades } from '@/components/dashboard/RecentTrades'
+import { MarketDataStatus } from '@/components/dashboard/MarketDataStatus'
 
 export default function DashboardPage() {
   const { trades, settings } = useTradingStore()
@@ -134,6 +135,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <MarketDataStatus />
     </div>
   )
 }

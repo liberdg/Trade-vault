@@ -102,6 +102,7 @@ export function TradeFormModal({ onClose, editTrade }: Props) {
         assetClass: form.assetClass,
         direction: form.direction,
         status: form.status,
+        source: editTrade?.source ?? 'manual' as const,
         entryDate: form.entryDate,
         exitDate: form.exitDate || undefined,
         entryPrice: parseFloat(form.entryPrice),

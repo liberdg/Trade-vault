@@ -4,6 +4,7 @@ import { useTradingStore } from '@/store/tradingStore'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { Toaster } from 'react-hot-toast'
+import { DataProvenanceBanner } from './DataProvenanceBanner'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const loadAll = useTradingStore(s => s.loadAll)
@@ -26,7 +27,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-auto p-6 relative">{children}</main>
+        <main className="flex-1 overflow-auto p-6 relative">
+          <div className="mb-6">
+            <DataProvenanceBanner />
+          </div>
+          {children}
+        </main>
       </div>
 
       <Toaster
