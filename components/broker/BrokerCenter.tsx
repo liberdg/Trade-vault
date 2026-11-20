@@ -321,7 +321,7 @@ export function BrokerCenter() {
                       <RefreshCw className="h-3 w-3" /> Reconnect
                     </button>
                   )}
-                  {connection.status === 'connected' && connection.accountId && !(activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment) && <button onClick={() => activateAccount(connection)} className="flex items-center gap-1.5 rounded-md border border-accent/30 px-2.5 py-1.5 text-[10px] font-mono text-accent hover:bg-accent/10">Set active</button>
+                  {connection.status === 'connected' && connection.accountId && !(activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment) && <button onClick={() => activateAccount(connection)} className="flex items-center gap-1.5 rounded-md border border-accent/30 px-2.5 py-1.5 text-[10px] font-mono text-accent hover:bg-accent/10">Set active</button>}
                   <button onClick={() => updateConnectionStatus(connection, 'disconnected')} className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[10px] font-mono text-muted hover:text-white">
                     <Unlink className="h-3 w-3" /> Disconnect
                   </button>
