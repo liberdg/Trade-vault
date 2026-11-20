@@ -35,6 +35,7 @@ export function BrokerCenter() {
     setSelected(entry)
     setConnectionType(entry.connectionTypes[0])
     setTestResult(null)
+    setNickname('')
     if (entry.id !== 'deriv') { setDerivAccounts([]); setSelectedDerivAccountId('') }
   }
 
@@ -78,7 +79,7 @@ export function BrokerCenter() {
           brokerName: selected.name,
           connectionType,
           accountId: result.accountId,
-          nickname: nickname.trim() || existing?.nickname || (selected.id === 'deriv' ? `Deriv ${result.accountId}` : undefined),
+          nickname: nickname.trim() || (selected.id === 'deriv' ? `Deriv ${result.accountId}` : existing?.nickname),
           environment,
           permissionMode: selected.recommendedPermission,
           status: 'connected',
