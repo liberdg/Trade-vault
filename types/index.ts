@@ -106,6 +106,7 @@ export interface UserSettings {
   customTags: string[]
   goals: Goal[]
   dashboardLayout: string[]
+  activeBrokerAccount?: { brokerId: string; accountId: string; environment: 'demo' | 'real' }
 }
 
 export interface AnalyticsData {
