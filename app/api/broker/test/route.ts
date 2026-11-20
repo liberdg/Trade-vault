@@ -110,7 +110,7 @@ async function verifyDerivWebSocket(url: string): Promise<{ ok: true } | { ok: f
   })
 }
 
-async function testDeriv(token: string, appId: string, environment: 'demo' | 'real') {
+async function testDeriv(token: string, appId: string, environment: 'demo' | 'real', requestedAccountId?: string) {
   try {
     // Step 1: PAT-authenticated REST request. Deriv-App-ID is mandatory for PAT.
     const accountsResult = await derivFetch('/trading/v1/options/accounts', token, appId)
@@ -126,8 +126,9 @@ async function testDeriv(token: string, appId: string, environment: 'demo' | 're
       return { status: 'synchronization_error', message: 'Deriv accepted the credentials but returned no recognizable Options accounts. The response format or account permissions need review.' }
     }
 
+    const accountSummaries = accounts.map(account => ({ accountId: getAccountId(account), environment: accountEnvironment(account), currency: typeof account.currency === 'string' ? account.currency : undefined, accountType: typeof account.account_type === 'string' ? account.account_type : undefined })).filter(account => !!account.accountId && !!account.environment)
     const matching = accounts.filter(account => accountEnvironment(account) === environment)
-    const selected = matching.find(account => getAccountId(account)) 
+    const selected = requestedAccountId ? matching.find(account => getAccountId(account) === requestedAccountId) : matching.find(account => getAccountId(account)) 
     if (!selected) {
       const available = accounts.map(account => accountEnvironment(account)).filter(Boolean)
       return {
@@ -171,6 +172,7 @@ async function testDeriv(token: string, appId: string, environment: 'demo' | 're
       accountId,
       currency: typeof currency === 'string' ? currency : undefined,
       environment,
+      accounts: accountSummaries,
     }
   } catch (error) {
     const isAbort = error instanceof Error && error.name === 'AbortError'
@@ -216,6 +218,7 @@ export async function POST(request: NextRequest) {
   const token = typeof body === 'object' && body !== null && 'token' in body && typeof body.token === 'string' ? body.token.trim() : ''
   const appId = typeof body === 'object' && body !== null && 'appId' in body && typeof body.appId === 'string' ? body.appId.trim() : ''
   const environment = typeof body === 'object' && body !== null && 'environment' in body && body.environment === 'real' ? 'real' : 'demo'
+  const requestedAccountId = typeof body === 'object' && body !== null && 'accountId' in body && typeof body.accountId === 'string' ? body.accountId : undefined
   const validation = validateBrokerConnectionRequest(brokerId, connectionType)
   if (!validation.valid) {
     return NextResponse.json({ status: 'invalid_request', message: validation.message }, { status: 400 })
@@ -227,7 +230,7 @@ export async function POST(request: NextRequest) {
     else if (brokerId === 'deriv' && connectionType === 'official_api') {
       if (!appId || !token) result = { status: 'invalid_request', message: 'Deriv App ID and Personal Access Token are required.' }
       else {
-        result = await testDeriv(token, appId, environment)
+        result = await testDeriv(token, appId, environment, requestedAccountId)
         if (result.status === 'connected' && result.environment !== environment) result = { status: 'account_environment_mismatch', message: `The token authenticated a ${result.environment} account, but ${environment} was selected.`, accountId: result.accountId }
       }
     }
