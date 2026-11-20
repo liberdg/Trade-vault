@@ -87,13 +87,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Deriv OTP URL environment does not match the selected account.' }, { status: 409 })
     }
     socket = await openSocket(url)
-    const [balanceMessage, portfolioMessage] = await Promise.all([
+    const [balanceMessage, portfolioMessage, statementMessage] = await Promise.all([
       wsRequest(socket, { balance: 1 }, 501),
       wsRequest(socket, { portfolio: 1 }, 502),
+      wsRequest(socket, { statement: 1, description: 1, limit: 20 }, 503),
     ])
     const balance = balanceMessage.balance && typeof balanceMessage.balance === 'object' ? balanceMessage.balance as Record<string, unknown> : null
     const portfolio = portfolioMessage.portfolio && typeof portfolioMessage.portfolio === 'object' ? portfolioMessage.portfolio as Record<string, unknown> : null
     const contracts = Array.isArray(portfolio?.contracts) ? portfolio.contracts : []
+    const statement = statementMessage.statement && typeof statementMessage.statement === 'object' ? statementMessage.statement as Record<string, unknown> : null
+    const transactions = Array.isArray(statement?.transactions) ? statement.transactions : []
     return NextResponse.json({
       status: 'verified',
       accountId,
@@ -102,6 +105,7 @@ export async function POST(request: NextRequest) {
       currency: balance?.currency,
       accountName: balance?.loginid,
       portfolio: contracts,
+      transactions,
       positionsCount: contracts.length,
       retrievedAt: new Date().toISOString(),
     })
