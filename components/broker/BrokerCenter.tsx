@@ -26,7 +26,14 @@ export function BrokerCenter() {
 
   useEffect(() => {
     db.brokerConnections.toArray().then(setConnections)
-    getSettings().then(settings => setActiveAccount(settings.activeBrokerAccount ?? null))
+    getSettings().then(settings => {
+      const active = settings.activeBrokerAccount ?? null
+      setActiveAccount(active)
+      if (active) {
+        const entry = BROKER_CATALOG.find(item => item.id === active.brokerId)
+        if (entry) { setSelected(entry); setConnectionType(entry.connectionTypes[0]); setEnvironment(active.environment) }
+      }
+    })
   }, [])
 
   const filtered = catalog.filter(entry =>
@@ -242,7 +249,7 @@ export function BrokerCenter() {
               </select>
             </Field>
             <Field label="Account nickname">
-              <input value={nickname} onChange={event => setNickname(event.target.value)} placeholder="EXNESS MAIN" className="market-input" />
+              <input value={nickname} onChange={event => setNickname(event.target.value)} placeholder="e.g. Main account" className="market-input" />
             </Field>
           </div>
 
