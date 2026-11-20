@@ -37,7 +37,7 @@ export const BROKER_CATALOG: BrokerCatalogEntry[] = [
   },
   {
     id: 'deriv', name: 'Deriv', description: 'Deriv account API',
-    platform: 'deriv_api', connectionTypes: ['oauth','official_api'], capabilities: ['accounts','balance','positions','pending_orders','history','market_data','place_order','modify_order','cancel_order','close_position'],
+    platform: 'deriv_api', connectionTypes: ['official_api'], capabilities: ['accounts','balance','positions','pending_orders','history','market_data','place_order','modify_order','cancel_order','close_position'],
     recommendedPermission: 'read_only', integrationStatus: 'real_adapter',
     credentials: ['Deriv API App ID', 'Personal access token'],
     warning: 'Deriv API products are separate from Deriv MT5 accounts. Demo and real accounts must remain explicitly distinct.',

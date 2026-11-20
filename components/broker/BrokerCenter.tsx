@@ -43,6 +43,14 @@ export function BrokerCenter() {
         body: JSON.stringify({ brokerId: selected.id, connectionType }),
       })
       const result = await response.json()
+      if (!response.ok) {
+        setTestResult({ status: result.status || 'connection_error', message: result.message || 'Broker request rejected.' })
+        return
+      }
+      if (result.status === 'connected' && !result.accountId) {
+        setTestResult({ status: 'synchronization_error', message: 'Broker validation did not return a verified account ID. Connection was not saved.' })
+        return
+      }
       setTestResult(result)
       if (result.status === 'connected') {
         const existing = connections.find(connection =>
@@ -97,9 +105,20 @@ export function BrokerCenter() {
         body: JSON.stringify({ brokerId: connection.brokerId, connectionType: connection.connectionType }),
       })
       const result = await response.json()
+      if (!response.ok) {
+        setTestResult({ status: result.status || 'connection_error', message: result.message || 'Broker request rejected.' })
+        return
+      }
+      if (result.status === 'connected' && connection.accountId && result.accountId && String(result.accountId) !== connection.accountId) {
+        setTestResult({ status: 'account_mismatch', message: 'The broker validated a different account. This saved connection was not reconnected to prevent account switching.' })
+        await updateConnectionStatus(connection, 'disconnected')
+        return
+      }
       setTestResult(result)
       if (result.status === 'connected') {
-        await updateConnectionStatus(connection, 'connected')
+        const refreshed = { ...connection, status: 'connected' as const, accountId: result.accountId || connection.accountId, server: result.server || connection.server, lastSync: result.checkedAt || new Date().toISOString(), updatedAt: new Date().toISOString() }
+        await db.brokerConnections.put(refreshed)
+        setConnections(await db.brokerConnections.toArray())
       }
     } catch (error) {
       setTestResult({ status: 'connection_error', message: error instanceof Error ? error.message : 'Reconnect failed.' })

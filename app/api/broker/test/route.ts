@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateBrokerConnectionRequest } from '@/lib/broker/connection-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,18 +112,32 @@ async function testMt5() {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const brokerId = typeof body.brokerId === 'string' ? body.brokerId : ''
-  const connectionType = typeof body.connectionType === 'string' ? body.connectionType : ''
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ status: 'invalid_request', message: 'Request body must be valid JSON.' }, { status: 400 })
+  }
+
+  const brokerId = typeof body === 'object' && body !== null && 'brokerId' in body ? body.brokerId : undefined
+  const connectionType = typeof body === 'object' && body !== null && 'connectionType' in body ? body.connectionType : undefined
+  const validation = validateBrokerConnectionRequest(brokerId, connectionType)
+  if (!validation.valid) {
+    return NextResponse.json({ status: 'invalid_request', message: validation.message }, { status: 400 })
+  }
 
   let result
-  if (brokerId === 'oanda' && connectionType === 'official_api') result = await testOanda()
-  else if (brokerId === 'deriv' && ['official_api','oauth'].includes(connectionType)) result = await testDeriv()
-  else if (['mt5','mt4','exness'].includes(brokerId) && ['mt5_bridge','mt4_bridge'].includes(connectionType)) result = await testMt5()
-  else if (brokerId === 'exness' && connectionType === 'official_api') {
-    result = { status: 'permission_error', message: 'Exness official API eligibility and credentials must be provided through a verified Exness API integration. Standard MT accounts are not assumed eligible.' }
-  } else {
-    result = { status: 'disconnected', message: 'This broker or connection method has no verified adapter configured.' }
+  try {
+    if (brokerId === 'oanda' && connectionType === 'official_api') result = await testOanda()
+    else if (brokerId === 'deriv' && connectionType === 'official_api') result = await testDeriv()
+    else if (['mt5', 'mt4', 'exness'].includes(brokerId as string) && ['mt5_bridge', 'mt4_bridge'].includes(connectionType as string)) result = await testMt5()
+    else if (brokerId === 'exness' && connectionType === 'official_api') {
+      result = { status: 'permission_error', message: 'Exness official API eligibility and credentials must be provided through a verified Exness API integration. Standard MT accounts are not assumed eligible.' }
+    } else {
+      result = { status: 'disconnected', message: 'This broker or connection method has no verified adapter configured.' }
+    }
+  } catch (error) {
+    result = { status: 'connection_error', message: error instanceof Error ? error.message : 'Broker connection test failed.' }
   }
 
   return NextResponse.json({
