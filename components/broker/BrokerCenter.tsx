@@ -78,7 +78,7 @@ export function BrokerCenter() {
           brokerName: selected.name,
           connectionType,
           accountId: result.accountId,
-          nickname: nickname.trim() || existing?.nickname,
+          nickname: nickname.trim() || existing?.nickname || (selected.id === 'deriv' ? `Deriv ${result.accountId}` : undefined),
           environment,
           permissionMode: selected.recommendedPermission,
           status: 'connected',
@@ -294,6 +294,7 @@ export function BrokerCenter() {
                   <div>
                     <div className="text-xs font-semibold text-white">{connection.nickname || connection.brokerName}</div>
                     <div className="mt-1 text-[9px] font-mono uppercase text-muted">{connection.brokerName} · {connection.environment} · {connection.status.replaceAll('_', ' ')}</div>
+                    {connection.accountId && <div className="mt-1 text-[10px] font-mono text-muted">Account ID: {connection.accountId}</div>}
                   </div>
                   <button onClick={() => removeConnection(connection)} className="text-muted hover:text-[#f06a6a]" aria-label="Remove connection"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
