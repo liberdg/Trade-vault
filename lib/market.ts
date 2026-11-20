@@ -1,4 +1,4 @@
-export type MarketKind = 'crypto' | 'forex' | 'stock' | 'index'
+export type MarketKind = 'crypto' | 'forex' | 'stock' | 'index' | 'metal'
 
 export interface Candle {
   time: number
@@ -11,11 +11,16 @@ export interface Candle {
 
 export interface MarketCandlesResult {
   symbol: string
-  provider: 'binance' | 'yahoo' | 'frankfurter'
+  provider: 'binance' | 'yahoo' | 'frankfurter' | 'deriv'
   status: 'realtime' | 'delayed' | 'eod'
   retrievedAt: string
   interval: string
   candles: Candle[]
+  bid?: number
+  ask?: number
+  last?: number
+  spread?: number
+  warning?: string
 }
 
 const BINANCE_INTERVALS: Record<string, string> = {
@@ -118,4 +123,123 @@ export async function fetchFrankfurterCandles(base: string, quote: string, range
       close,
     }]
   }).sort((a, b) => a.time - b.time)
+}
+
+const DERIV_INTERVALS: Record<string, number | null> = {
+  '1m': 60,
+  '5m': 300,
+  '15m': 900,
+  '30m': 1800,
+  '1h': 3600,
+  '2h': 7200,
+  '4h': 14400,
+  '1d': 86400,
+  '1w': 604800,
+  '1mo': null,
+}
+
+export function toDerivSymbol(symbol: string, kind: MarketKind): string {
+  const clean = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (kind === 'metal') {
+    if (clean.includes('XAU') || clean === 'GOLD') return 'frxXAUUSD'
+    if (clean.includes('XAG') || clean === 'SILVER') return 'frxXAGUSD'
+  }
+  if (kind === 'forex') return `frx${clean}`
+  return clean
+}
+
+export async function fetchDerivCandles(symbol: string, interval: string, kind: MarketKind): Promise<{
+  candles: Candle[]
+  bid?: number
+  ask?: number
+  last?: number
+  spread?: number
+  retrievedAt: string
+}> {
+  const granularity = DERIV_INTERVALS[interval]
+  if (granularity == null) throw new Error(`Deriv does not provide a direct ${interval} candle feed`)
+
+  const derivSymbol = toDerivSymbol(symbol, kind)
+  const appId = process.env.DERIV_APP_ID || '1089'
+
+  return await new Promise((resolve, reject) => {
+    let socket: WebSocket
+    try {
+      socket = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${encodeURIComponent(appId)}`)
+    } catch (error) {
+      reject(error)
+      return
+    }
+
+    let candlesReceived = false
+    let latestQuote: { bid?: number; ask?: number; last?: number; spread?: number } = {}
+    const timeout = setTimeout(() => {
+      socket.close()
+      reject(new Error('Deriv market WebSocket timed out'))
+    }, 12000)
+
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        ticks_history: derivSymbol,
+        end: 'latest',
+        count: 200,
+        style: 'candles',
+        granularity,
+        subscribe: 0,
+        req_id: 1,
+      }))
+      socket.send(JSON.stringify({ ticks: derivSymbol, subscribe: 1, req_id: 2 }))
+    }
+    socket.onmessage = event => {
+      try {
+        const data = JSON.parse(String(event.data))
+        if (data.error) {
+          clearTimeout(timeout)
+          socket.close()
+          reject(new Error(data.error.message || 'Deriv market data authorization failed'))
+          return
+        }
+        if (data.candles && !candlesReceived) {
+          candlesReceived = true
+          const candles = data.candles.map((candle: { epoch: number; open: number; high: number; low: number; close: number }) => ({
+            time: Number(candle.epoch) * 1000,
+            open: Number(candle.open),
+            high: Number(candle.high),
+            low: Number(candle.low),
+            close: Number(candle.close),
+          })).filter((candle: Candle) => [candle.open,candle.high,candle.low,candle.close].every(Number.isFinite))
+          if (candles.length > 0) {
+            setTimeout(() => {
+              clearTimeout(timeout)
+              socket.close()
+              resolve({
+                candles,
+                ...latestQuote,
+                retrievedAt: new Date().toISOString(),
+              })
+            }, 150)
+          }
+        }
+        if (data.tick) {
+          const bid = typeof data.tick.bid === 'number' ? data.tick.bid : undefined
+          const ask = typeof data.tick.ask === 'number' ? data.tick.ask : undefined
+          const last = typeof data.tick.quote === 'number' ? data.tick.quote : undefined
+          latestQuote = {
+            bid,
+            ask,
+            last,
+            spread: bid !== undefined && ask !== undefined ? ask - bid : undefined,
+          }
+        }
+      } catch (error) {
+        clearTimeout(timeout)
+        socket.close()
+        reject(error instanceof Error ? error : new Error('Invalid Deriv market response'))
+      }
+    }
+    socket.onerror = () => {
+      clearTimeout(timeout)
+      reject(new Error('Deriv market WebSocket connection failed'))
+    }
+  })
 }

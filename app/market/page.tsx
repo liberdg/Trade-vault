@@ -5,22 +5,16 @@ import {
   fetchBinanceCandles,
   fetchFrankfurterCandles,
   fetchYahooCandles,
+  fetchDerivCandles,
   MarketCandlesResult,
   MarketKind,
 } from '@/lib/market'
 import { analyzeCandles, MarketAnalysis } from '@/lib/smrt-analysis'
+import { MARKET_INSTRUMENTS } from '@/lib/market-instruments'
 
 export const dynamic = 'force-dynamic'
 
-const SYMBOLS = [
-  { symbol: 'BTCUSDT', kind: 'crypto', label: 'BTC / USDT', className: 'Crypto' },
-  { symbol: 'ETHUSDT', kind: 'crypto', label: 'ETH / USDT', className: 'Crypto' },
-  { symbol: 'SOLUSDT', kind: 'crypto', label: 'SOL / USDT', className: 'Crypto' },
-  { symbol: 'EURUSD', kind: 'forex', label: 'EUR / USD', className: 'Forex' },
-  { symbol: 'GBPUSD', kind: 'forex', label: 'GBP / USD', className: 'Forex' },
-  { symbol: 'USDJPY', kind: 'forex', label: 'USD / JPY', className: 'Forex' },
-  { symbol: '^GSPC', kind: 'index', label: 'S&P 500', className: 'Indices' },
-]
+const SYMBOLS = MARKET_INSTRUMENTS
 
 interface Props {
   searchParams: { symbol?: string; interval?: string }
@@ -55,6 +49,24 @@ async function loadMarket(symbol: string, kind: MarketKind, interval: string): P
     const match = symbol.match(/^([A-Z]{3})([A-Z]{3})$/)
     if (!match) throw new Error('Invalid forex symbol')
     try {
+      const deriv = await fetchDerivCandles(symbol, interval, kind)
+      return {
+        symbol,
+        provider: 'deriv',
+        status: 'realtime',
+        retrievedAt: deriv.retrievedAt,
+        interval,
+        candles: deriv.candles,
+        bid: deriv.bid,
+        ask: deriv.ask,
+        last: deriv.last,
+        spread: deriv.spread,
+      }
+    } catch {
+      if (interval === '2h' || interval === '1mo') {
+        throw new Error(`No verified provider returned ${interval} candles`)
+      }
+      try {
       const candles = await fetchYahooCandles(symbol, interval, kind)
       return {
         symbol,
@@ -64,7 +76,7 @@ async function loadMarket(symbol: string, kind: MarketKind, interval: string): P
         interval,
         candles,
       }
-    } catch (yahooError) {
+      } catch (yahooError) {
       const [, base, quote] = match
       const candles = await fetchFrankfurterCandles(base, quote)
       return {
@@ -75,6 +87,30 @@ async function loadMarket(symbol: string, kind: MarketKind, interval: string): P
         interval: '1d',
         candles,
       }
+      }
+    }
+  }
+
+  if (kind === 'metal') {
+    try {
+      const deriv = await fetchDerivCandles(symbol, interval, kind)
+      return {
+        symbol,
+        provider: 'deriv',
+        status: 'realtime',
+        retrievedAt: deriv.retrievedAt,
+        interval,
+        candles: deriv.candles,
+        bid: deriv.bid,
+        ask: deriv.ask,
+        last: deriv.last,
+        spread: deriv.spread,
+      }
+    } catch (error) {
+      if (interval === '2h' || interval === '1mo') {
+        throw new Error(`No verified provider returned ${interval} candles`)
+      }
+      throw new Error(error instanceof Error ? error.message : 'No verified XAUUSD/XAGUSD spot or broker feed is available')
     }
   }
 
@@ -91,7 +127,7 @@ async function loadMarket(symbol: string, kind: MarketKind, interval: string): P
 
 export default async function MarketPage({ searchParams }: Props) {
   const selected = SYMBOLS.find(item => item.symbol === searchParams.symbol?.toUpperCase()) ?? SYMBOLS[0]
-  const interval = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].includes(searchParams.interval ?? '')
+  const interval = ['1m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1mo'].includes(searchParams.interval ?? '')
     ? searchParams.interval!
     : '1d'
 
@@ -130,7 +166,7 @@ export default async function MarketPage({ searchParams }: Props) {
                 className={`block w-full rounded-xl border px-3 py-3 transition-all ${selected.symbol === item.symbol ? 'border-accent/30 bg-accent/10' : 'border-transparent hover:border-border hover:bg-white/[0.02]'}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-semibold text-white">{item.label}</span>
-                  <span className="text-[10px] font-mono text-muted">{item.className}</span>
+                  <span className="text-[10px] font-mono text-muted">{item.category}</span>
                 </div>
               </Link>
             ))}
@@ -150,9 +186,16 @@ export default async function MarketPage({ searchParams }: Props) {
                   {latest.close.toLocaleString('en-US', { maximumFractionDigits: latest.close < 10 ? 5 : 2 })}
                 </div>
               )}
+              {data?.bid !== undefined && data?.ask !== undefined && (
+                <div className="mt-2 flex gap-3 font-mono text-[10px] text-muted">
+                  <span>BID {data.bid.toLocaleString('en-US', { maximumFractionDigits: latest && latest.close < 10 ? 5 : 2 })}</span>
+                  <span>ASK {data.ask.toLocaleString('en-US', { maximumFractionDigits: latest && latest.close < 10 ? 5 : 2 })}</span>
+                  {data.spread !== undefined && <span>SPREAD {data.spread.toLocaleString('en-US', { maximumFractionDigits: 5 })}</span>}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-1">
-              {['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].map(item => (
+              {['1m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1mo'].map(item => (
                 <Link key={item} href={`/market?symbol=${selected.symbol}&interval=${item}`}
                   className={`rounded-lg border px-2.5 py-1.5 text-xs font-mono ${interval === item ? 'border-accent/30 bg-accent/10 text-accent' : 'border-border text-muted hover:text-white'}`}>
                   {item}
@@ -170,7 +213,7 @@ export default async function MarketPage({ searchParams }: Props) {
             </div>
           )}
           {data && (
-            <RealMarketChart candles={data.candles} provider={data.provider} status={data.status} retrievedAt={data.retrievedAt} analysis={analysis ?? undefined} />
+            <RealMarketChart candles={data.candles} provider={data.provider} status={data.status} retrievedAt={data.retrievedAt} analysis={analysis ?? undefined} symbol={selected.symbol} kind={selected.kind} interval={interval} />
           )}
           {analysis && (
             <div className="mt-5 grid gap-3 md:grid-cols-3">

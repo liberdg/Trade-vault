@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchBinanceCandles, fetchFrankfurterCandles, fetchYahooCandles, MarketKind } from '@/lib/market'
+import { fetchBinanceCandles, fetchDerivCandles, fetchFrankfurterCandles, fetchYahooCandles, MarketKind } from '@/lib/market'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +39,30 @@ export async function GET(request: NextRequest) {
     if (kind === 'forex') {
       const match = symbol.match(/^([A-Z]{3})([A-Z]{3})$/)
       if (!match) return NextResponse.json({ error: 'Forex symbols must use ISO pair format, for example EURUSD' }, { status: 400 })
+      if (interval === '1mo') return NextResponse.json({ error: 'Monthly candles are not available from the current forex provider.', retrievedAt: new Date().toISOString() }, { status: 502 })
 
+      try {
+        const deriv = await fetchDerivCandles(symbol, interval, kind)
+        return NextResponse.json({
+          symbol,
+          provider: 'deriv',
+          status: 'realtime',
+          retrievedAt: deriv.retrievedAt,
+          interval,
+          candles: deriv.candles,
+          bid: deriv.bid,
+          ask: deriv.ask,
+          last: deriv.last,
+          spread: deriv.spread,
+        })
+      } catch (derivError) {
+        if (interval === '2h' || interval === '1mo') {
+          return NextResponse.json({
+            error: `No verified provider returned ${interval} candles`,
+            detail: derivError instanceof Error ? derivError.message : 'Deriv unavailable',
+            retrievedAt: new Date().toISOString(),
+          }, { status: 502 })
+        }
       try {
         const candles = await fetchYahooCandles(symbol, interval, kind)
         return NextResponse.json({
@@ -62,6 +85,38 @@ export async function GET(request: NextRequest) {
           candles,
           warning: yahooError instanceof Error ? yahooError.message : 'Yahoo Finance unavailable',
         })
+      }
+      }
+    }
+
+    if (kind === 'metal') {
+      try {
+        const deriv = await fetchDerivCandles(symbol, interval, kind)
+        return NextResponse.json({
+          symbol,
+          provider: 'deriv',
+          status: 'realtime',
+          retrievedAt: deriv.retrievedAt,
+          interval,
+          candles: deriv.candles,
+          bid: deriv.bid,
+          ask: deriv.ask,
+          last: deriv.last,
+          spread: deriv.spread,
+        })
+      } catch (derivError) {
+        if (interval === '2h' || interval === '1mo') {
+          return NextResponse.json({
+            error: `No verified provider returned ${interval} candles`,
+            detail: derivError instanceof Error ? derivError.message : 'Deriv unavailable',
+            retrievedAt: new Date().toISOString(),
+          }, { status: 502 })
+        }
+        return NextResponse.json({
+          error: 'No verified XAUUSD/XAGUSD spot or broker feed is available',
+          detail: derivError instanceof Error ? derivError.message : 'Deriv unavailable',
+          retrievedAt: new Date().toISOString(),
+        }, { status: 502 })
       }
     }
 

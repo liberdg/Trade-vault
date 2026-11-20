@@ -87,6 +87,27 @@ export function BrokerCenter() {
     setConnections(await db.brokerConnections.toArray())
   }
 
+  const reconnectConnection = async (connection: BrokerConnection) => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const response = await fetch('/api/broker/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brokerId: connection.brokerId, connectionType: connection.connectionType }),
+      })
+      const result = await response.json()
+      setTestResult(result)
+      if (result.status === 'connected') {
+        await updateConnectionStatus(connection, 'connected')
+      }
+    } catch (error) {
+      setTestResult({ status: 'connection_error', message: error instanceof Error ? error.message : 'Reconnect failed.' })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   const closeAllPositions = async () => {
     setCloseReport('')
     if (!confirm('Close all open positions on the selected accounts?')) return
@@ -131,21 +152,6 @@ export function BrokerCenter() {
               className="w-full rounded-md border border-border bg-[#090c10] py-2 pl-9 pr-3 text-xs text-white placeholder:text-muted focus:border-accent/40 focus:outline-none" />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="workstation-panel p-4">
-              <div className="workstation-label">Global position control</div>
-              <p className="mt-2 text-xs leading-relaxed text-muted">Fetching and closing positions is enabled only after a broker adapter confirms live account positions. No pending order is touched by this action.</p>
-              <button onClick={closeAllPositions} disabled={connectedCount === 0} className="mt-4 rounded-md border border-[#f06a6a]/30 bg-[#f06a6a]/10 px-4 py-2 text-xs font-mono font-semibold text-[#f06a6a] disabled:cursor-not-allowed disabled:opacity-40">
-                CLOSE ALL POSITIONS
-              </button>
-              {closeReport && <div className="mt-3 rounded-lg border border-border bg-[#090c10] px-3 py-2 text-[11px] text-muted">{closeReport}</div>}
-            </section>
-            <section className="workstation-panel p-4">
-              <div className="workstation-label">Pending orders</div>
-              <p className="mt-2 text-xs leading-relaxed text-muted">Cancellation is a separate verified action. It is not available without a connected adapter exposing pending-order capabilities.</p>
-              <button disabled className="mt-4 rounded-md border border-border px-4 py-2 text-xs font-mono text-muted opacity-40">CANCEL ALL PENDING ORDERS</button>
-            </section>
-          </div>
           <div className="space-y-1">
             {filtered.map(entry => (
               <button key={entry.id} onClick={() => selectBroker(entry)}
@@ -201,7 +207,7 @@ export function BrokerCenter() {
 
           <button onClick={testConnection} disabled={testing} className="mt-4 flex h-9 items-center gap-2 rounded-md bg-accent px-4 text-xs font-bold text-[#090c10] disabled:opacity-50">
             {testing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
-            Test connection
+            Test & connect
           </button>
 
           {testResult && (
@@ -230,6 +236,11 @@ export function BrokerCenter() {
                   <button onClick={() => removeConnection(connection)} className="text-muted hover:text-[#f06a6a]" aria-label="Remove connection"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
                 <div className="mt-3 flex gap-2">
+                  {connection.status === 'disconnected' && (
+                    <button onClick={() => reconnectConnection(connection)} className="flex items-center gap-1.5 rounded-md border border-accent/30 px-2.5 py-1.5 text-[10px] font-mono text-accent hover:bg-accent/10">
+                      <RefreshCw className="h-3 w-3" /> Reconnect
+                    </button>
+                  )}
                   <button onClick={() => updateConnectionStatus(connection, 'disconnected')} className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[10px] font-mono text-muted hover:text-white">
                     <Unlink className="h-3 w-3" /> Disconnect
                   </button>
@@ -238,6 +249,22 @@ export function BrokerCenter() {
             ))}
           </div>
         </aside>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="workstation-panel p-4">
+          <div className="workstation-label">Global position control</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted">Fetching and closing positions is enabled only after a broker adapter confirms live account positions. No pending order is touched by this action.</p>
+          <button onClick={closeAllPositions} disabled={connectedCount === 0} className="mt-4 rounded-md border border-[#f06a6a]/30 bg-[#f06a6a]/10 px-4 py-2 text-xs font-mono font-semibold text-[#f06a6a] disabled:cursor-not-allowed disabled:opacity-40">
+            CLOSE ALL POSITIONS
+          </button>
+          {closeReport && <div className="mt-3 rounded-lg border border-border bg-[#090c10] px-3 py-2 text-[11px] text-muted">{closeReport}</div>}
+        </section>
+        <section className="workstation-panel p-4">
+          <div className="workstation-label">Pending orders</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted">Cancellation is a separate verified action. It is not available without a connected adapter exposing pending-order capabilities.</p>
+          <button disabled className="mt-4 rounded-md border border-border px-4 py-2 text-xs font-mono text-muted opacity-40">CANCEL ALL PENDING ORDERS</button>
+        </section>
       </div>
     </div>
   )

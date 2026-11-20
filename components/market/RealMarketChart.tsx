@@ -1,6 +1,7 @@
 'use client'
 
 import { format } from 'date-fns'
+import { useEffect, useState } from 'react'
 import type { Candle } from '@/lib/market'
 import type { MarketAnalysis } from '@/lib/smrt-analysis'
 
@@ -10,9 +11,49 @@ interface Props {
   status: string
   retrievedAt: string
   analysis?: MarketAnalysis
+  symbol?: string
+  kind?: string
+  interval?: string
 }
 
-export function RealMarketChart({ candles, provider, status, retrievedAt, analysis }: Props) {
+export function RealMarketChart({ candles, provider, status, retrievedAt, analysis, symbol, kind, interval }: Props) {
+  const [liveCandles, setLiveCandles] = useState(candles)
+  const [liveStatus, setLiveStatus] = useState(status)
+  const [liveRetrievedAt, setLiveRetrievedAt] = useState(retrievedAt)
+
+  useEffect(() => {
+    setLiveCandles(candles)
+  }, [candles])
+
+  useEffect(() => {
+    if (status !== 'realtime' || !symbol || !kind || !interval) return
+    let cancelled = false
+    const refresh = async () => {
+      try {
+        const response = await fetch(`/api/market/candles?symbol=${encodeURIComponent(symbol)}&kind=${kind}&interval=${interval}`, { cache: 'no-store' })
+        if (!response.ok) return
+        const data = await response.json()
+        if (cancelled || !Array.isArray(data.candles)) return
+        const merged = new Map<number, Candle>()
+        for (const candle of liveCandles) merged.set(candle.time, candle)
+        for (const candle of data.candles) merged.set(candle.time, candle)
+        setLiveCandles(Array.from(merged.values()).sort((a, b) => a.time - b.time).slice(-200))
+        setLiveStatus(data.status)
+        setLiveRetrievedAt(data.retrievedAt)
+      } catch {
+        setLiveStatus('delayed')
+      }
+    }
+    const timer = window.setInterval(refresh, 30000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [status, symbol, kind, interval])
+
+  candles = liveCandles
+  status = liveStatus
+  retrievedAt = liveRetrievedAt
   if (candles.length === 0) {
     return <div className="flex h-96 items-center justify-center text-sm font-mono text-muted">Aucune bougie retournée par le fournisseur.</div>
   }
