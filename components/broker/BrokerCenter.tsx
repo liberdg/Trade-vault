@@ -6,6 +6,7 @@ import { BROKER_CATALOG, BrokerCatalogEntry } from '@/lib/broker/core'
 import { db, getSettings, updateSettings } from '@/lib/db'
 import type { BrokerConnection, BrokerConnectionStatus, BrokerConnectionType } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
+import { DerivAccountPanel } from './DerivAccountPanel'
 
 export function BrokerCenter() {
   const [catalog, setCatalog] = useState<BrokerCatalogEntry[]>(BROKER_CATALOG)
@@ -336,6 +337,7 @@ export function BrokerCenter() {
               </div>
             ))}
           </div>
+          {activeAccount?.brokerId === 'deriv' && <DerivAccountPanel appId={derivAppId} token={derivToken} accountId={activeAccount.accountId} environment={activeAccount.environment} />}
         </aside>
       </div>
 
