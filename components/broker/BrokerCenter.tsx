@@ -114,11 +114,13 @@ export function BrokerCenter() {
   const updateConnectionStatus = async (connection: BrokerConnection, status: BrokerConnectionStatus) => {
     const updated = { ...connection, status, updatedAt: new Date().toISOString(), lastSync: status === 'disconnected' ? connection.lastSync : new Date().toISOString() }
     await db.brokerConnections.put(updated)
+    if (status === 'disconnected' && activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment) { await updateSettings({ activeBrokerAccount: undefined }); setActiveAccount(null) }
     setConnections(await db.brokerConnections.toArray())
   }
 
   const removeConnection = async (connection: BrokerConnection) => {
     await db.brokerConnections.delete(connection.id)
+    if (activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment) { await updateSettings({ activeBrokerAccount: undefined }); setActiveAccount(null) }
     setConnections(await db.brokerConnections.toArray())
   }
 
