@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Link2, RefreshCw, Search, ShieldCheck, Trash2, Unlink } from 'lucide-react'
 import { BROKER_CATALOG, BrokerCatalogEntry } from '@/lib/broker/core'
-import { db } from '@/lib/db'
+import { db, getSettings, updateSettings } from '@/lib/db'
 import type { BrokerConnection, BrokerConnectionStatus, BrokerConnectionType } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -21,10 +21,12 @@ export function BrokerCenter() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ status: string; message: string; accountId?: string } | null>(null)
   const [connections, setConnections] = useState<BrokerConnection[]>([])
+  const [activeAccount, setActiveAccount] = useState<{ brokerId: string; accountId: string; environment: 'demo' | 'real' } | null>(null)
   const [closeReport, setCloseReport] = useState('')
 
   useEffect(() => {
     db.brokerConnections.toArray().then(setConnections)
+    getSettings().then(settings => setActiveAccount(settings.activeBrokerAccount ?? null))
   }, [])
 
   const filtered = catalog.filter(entry =>
@@ -90,6 +92,9 @@ export function BrokerCenter() {
           updatedAt: new Date().toISOString(),
         }
         await db.brokerConnections.put(connection)
+        const nextActive = { brokerId: connection.brokerId, accountId: connection.accountId!, environment: connection.environment }
+        await updateSettings({ activeBrokerAccount: nextActive })
+        setActiveAccount(nextActive)
         setConnections(await db.brokerConnections.toArray())
       }
     } catch (error) {
@@ -97,6 +102,13 @@ export function BrokerCenter() {
     } finally {
       setTesting(false)
     }
+  }
+
+  const activateAccount = async (connection: BrokerConnection) => {
+    if (!connection.accountId || connection.status !== 'connected') return
+    const active = { brokerId: connection.brokerId, accountId: connection.accountId, environment: connection.environment }
+    await updateSettings({ activeBrokerAccount: active })
+    setActiveAccount(active)
   }
 
   const updateConnectionStatus = async (connection: BrokerConnection, status: BrokerConnectionStatus) => {
@@ -286,6 +298,7 @@ export function BrokerCenter() {
 
         <aside className="workstation-panel p-4">
           <div className="workstation-label">Configured connections</div>
+          <div className="mt-2 rounded-md border border-accent/20 bg-accent/5 px-3 py-2 text-[10px] font-mono text-accent">ACTIVE ACCOUNT · {activeAccount ? `${activeAccount.brokerId.toUpperCase()} / ${activeAccount.accountId} / ${activeAccount.environment.toUpperCase()}` : 'NONE SELECTED'}</div>
           <div className="mt-3 space-y-2">
             {connections.length === 0 ? (
               <div className="rounded-lg border border-border px-3 py-5 text-center text-xs text-muted">No verified connection</div>
@@ -296,6 +309,7 @@ export function BrokerCenter() {
                     <div className="text-xs font-semibold text-white">{connection.nickname || connection.brokerName}</div>
                     <div className="mt-1 text-[9px] font-mono uppercase text-muted">{connection.brokerName} · {connection.environment} · {connection.status.replaceAll('_', ' ')}</div>
                     {connection.accountId && <div className="mt-1 text-[10px] font-mono text-muted">Account ID: {connection.accountId}</div>}
+                    {activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment && <div className="mt-2 inline-flex rounded border border-[#2ad39b]/20 bg-[#2ad39b]/10 px-2 py-1 text-[9px] font-mono text-[#2ad39b]">ACTIVE TRADING ACCOUNT</div>}
                   </div>
                   <button onClick={() => removeConnection(connection)} className="text-muted hover:text-[#f06a6a]" aria-label="Remove connection"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
@@ -305,6 +319,7 @@ export function BrokerCenter() {
                       <RefreshCw className="h-3 w-3" /> Reconnect
                     </button>
                   )}
+                  {connection.status === 'connected' && connection.accountId && !(activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment) && <button onClick={() => activateAccount(connection)} className="flex items-center gap-1.5 rounded-md border border-accent/30 px-2.5 py-1.5 text-[10px] font-mono text-accent hover:bg-accent/10">Set active</button>
                   <button onClick={() => updateConnectionStatus(connection, 'disconnected')} className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[10px] font-mono text-muted hover:text-white">
                     <Unlink className="h-3 w-3" /> Disconnect
                   </button>
