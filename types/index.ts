@@ -124,3 +124,24 @@ export interface AnalyticsData {
   consecutiveLosses: number
   expectancy: number
 }
+
+export type BrokerConnectionType = 'official_api' | 'oauth' | 'mt5_bridge' | 'mt4_bridge' | 'ctrader_api' | 'exchange_api'
+export type BrokerPermissionMode = 'read_only' | 'trading_enabled'
+export type BrokerConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'authentication_error' | 'permission_error' | 'synchronization_error' | 'execution_disabled'
+
+export interface BrokerConnection {
+  id: string
+  brokerId: string
+  brokerName: string
+  connectionType: BrokerConnectionType
+  accountId?: string
+  nickname?: string
+  environment: 'demo' | 'real'
+  permissionMode: BrokerPermissionMode
+  status: BrokerConnectionStatus
+  server?: string
+  platform?: 'deriv_api' | 'mt5' | 'mt4' | 'ctrader' | 'binance' | 'bybit' | 'exness_api' | 'exness_mt5' | 'oanda'
+  lastSync?: string
+  createdAt: string
+  updatedAt: string
+}

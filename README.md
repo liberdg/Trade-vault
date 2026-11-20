@@ -137,6 +137,15 @@ L'application analyse tes trades locaux avec des heuristiques déterministes et 
 - **Indices/stocks**: Yahoo Finance chart endpoint.
 - **Broker**: OANDA v20 practice/live accounts. Configure server-only variables from `.env.example`. Live order execution requires `OANDA_ALLOW_LIVE=true`, `OANDA_ENVIRONMENT=live`, and explicit confirmation in the UI.
 
+### Broker Connectivity Engine
+
+- Broker catalog and connection records are modeled as independent adapters/capabilities.
+- OANDA practice/live uses server-only API token and account settings.
+- Deriv requires `DERIV_APP_ID` and `DERIV_API_TOKEN`; test connection authorizes through the official WebSocket endpoint.
+- MT5/MT4 require an authenticated local or EA bridge through `MT5_BRIDGE_URL`/`MT5_BRIDGE_TOKEN` or `MT4_BRIDGE_URL`/`MT4_BRIDGE_TOKEN`.
+- Exness standard MT accounts are not assumed eligible for the Exness API. Use the MT5 bridge method until a verified Exness API integration is available.
+- Close-all and pending-order cancellation remain explicit, separate actions and will not claim success without a broker-confirmed position source.
+
 All provider failures are returned as unavailable states. The app never converts missing provider data into fabricated candles or connection status.
 
 ## 🔮 Évolutivité (SaaS-ready)

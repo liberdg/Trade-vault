@@ -1,15 +1,21 @@
 import Dexie, { Table } from 'dexie'
-import type { Trade, UserSettings } from '@/types'
+import type { Trade, UserSettings, BrokerConnection } from '@/types'
 
 export class TradingJournalDB extends Dexie {
   trades!: Table<Trade>
   settings!: Table<UserSettings>
+  brokerConnections!: Table<BrokerConnection>
 
   constructor() {
     super('TradingJournalDB')
     this.version(1).stores({
       trades: 'id, createdAt, entryDate, exitDate, symbol, assetClass, direction, status, strategy, pnl',
       settings: '++id',
+    })
+    this.version(2).stores({
+      trades: 'id, createdAt, entryDate, exitDate, symbol, assetClass, direction, status, strategy, pnl',
+      settings: '++id',
+      brokerConnections: 'id, brokerId, status, environment, accountId, updatedAt',
     })
   }
 }
