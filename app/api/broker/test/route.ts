@@ -29,6 +29,9 @@ type DerivAccount = Record<string, unknown>
 function getDerivAccounts(payload: unknown): DerivAccount[] {
   if (!payload || typeof payload !== 'object') return []
   const root = payload as Record<string, unknown>
+  if (Array.isArray(root.data)) {
+    return root.data.filter((account): account is DerivAccount => !!account && typeof account === 'object')
+  }
   const data = root.data && typeof root.data === 'object' ? root.data as Record<string, unknown> : root
   const candidates = [data.accounts, data.account_list, data.items]
   const accounts = candidates.find(Array.isArray)
