@@ -24,8 +24,7 @@ async function testOanda() {
   }
 }
 
-async function testDeriv(token: string, appId: string)
-
+async function testDeriv(token: string, appId: string) {
   return await new Promise<{ status: string; message: string; accountId?: string; currency?: string; environment?: 'demo' | 'real' }>((resolve) => {
     let settled = false
     let socket: WebSocket
@@ -136,6 +135,7 @@ export async function POST(request: NextRequest) {
         result = await testDeriv(token, appId)
         if (result.status === 'connected' && result.environment !== environment) result = { status: 'account_environment_mismatch', message: `The token authenticated a ${result.environment} account, but ${environment} was selected.`, accountId: result.accountId }
       }
+    }
     else if (['mt5', 'mt4', 'exness'].includes(brokerId as string) && ['mt5_bridge', 'mt4_bridge'].includes(connectionType as string)) result = await testMt5()
     else if (brokerId === 'exness' && connectionType === 'official_api') {
       result = { status: 'permission_error', message: 'Exness official API eligibility and credentials must be provided through a verified Exness API integration. Standard MT accounts are not assumed eligible.' }
