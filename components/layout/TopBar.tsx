@@ -1,69 +1,74 @@
 'use client'
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Bell, Plus, ChevronDown } from 'lucide-react'
-import { format } from 'date-fns'
-import { fr } from 'date-fns/locale'
-import { useTradingStore } from '@/store/tradingStore'
+
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Plus, Search, WifiOff } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
 import { TradeFormModal } from '@/components/journal/TradeFormModal'
 
 export function TopBar() {
   const [showForm, setShowForm] = useState(false)
   const [search, setSearch] = useState('')
-  const trades = useTradingStore(s => s.trades)
+  const [marketAvailable, setMarketAvailable] = useState<boolean | null>(null)
+  const pathname = usePathname()
+  const router = useRouter()
 
-  const openTrades = trades.filter(t => t.status === 'OPEN')
-  const todayPnl = trades
-    .filter(t => t.status === 'CLOSED' && t.pnl !== undefined && t.entryDate.startsWith(format(new Date(), 'yyyy-MM-dd')))
-    .reduce((s, t) => s + (t.pnl ?? 0), 0)
+  useEffect(() => {
+    fetch('/api/market/candles?symbol=BTCUSDT&kind=crypto&interval=1h', { cache: 'no-store' })
+      .then(response => setMarketAvailable(response.ok))
+      .catch(() => setMarketAvailable(false))
+  }, [])
+
+  const title = ({
+    '/': 'Overview',
+    '/market': 'Markets',
+    '/scanner': 'Scanner',
+    '/signals': 'Signals',
+    '/planner': 'Trade Plan',
+    '/broker': 'Execution',
+    '/journal': 'Journal',
+    '/analytics': 'Analytics',
+    '/calendar': 'Calendar',
+    '/settings': 'Settings',
+  } as Record<string, string>)[pathname] ?? 'Workspace'
 
   return (
     <>
-      <header className="h-16 border-b border-border bg-surface/60 backdrop-blur-xl flex items-center px-6 gap-4 shrink-0">
-        {/* Date */}
-        <div className="font-mono text-xs text-muted capitalize">
-          {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
+      <header className="h-16 shrink-0 border-b border-border bg-[#0b0e12] flex items-center px-4 gap-3 lg:px-5">
+        <div className="hidden min-w-[150px] sm:block">
+          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted">Workspace</div>
+          <div className="mt-0.5 text-sm font-semibold text-white">{title}</div>
         </div>
-
-        {/* Search */}
-        <div className="flex-1 max-w-xs relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
+        <div className="mx-auto hidden max-w-[420px] flex-1 relative lg:block">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher un trade..."
-            className="w-full bg-panel border border-border rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder:text-muted focus:outline-none focus:border-accent/50 font-mono"
+            onChange={event => setSearch(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter' && search.trim()) {
+                const symbol = search.trim().toUpperCase().replace(/[-/]/g, '')
+                router.push(`/market?symbol=${encodeURIComponent(symbol)}&interval=1d`)
+              }
+            }}
+            placeholder="Search symbol"
+            className="w-full rounded-md border border-border bg-[#090c10] py-2 pl-9 pr-4 text-xs text-white placeholder:text-muted focus:border-accent/40 focus:outline-none"
           />
         </div>
-
-        <div className="flex-1" />
-
-        {/* Today PnL */}
-        {todayPnl !== 0 && (
-          <div className={`font-mono text-sm font-bold px-3 py-1.5 rounded-lg border ${
-            todayPnl > 0 ? 'bg-bull-dim border-bull/20 text-bull' : 'bg-bear-dim border-bear/20 text-bear'
-          }`}>
-            Aujourd'hui: {todayPnl > 0 ? '+' : ''}{todayPnl.toFixed(2)}$
-          </div>
-        )}
-
-        {/* Open trades badge */}
-        {openTrades.length > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20">
-            <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <span className="text-xs font-mono text-accent">{openTrades.length} ouvert{openTrades.length > 1 ? 's' : ''}</span>
-          </div>
-        )}
-
-        {/* New Trade */}
+        <div className={`hidden items-center gap-2 rounded-md border px-2.5 py-1.5 font-mono text-[10px] sm:flex ${
+          marketAvailable === true ? 'border-[#2ad39b]/20 text-[#2ad39b]' : 'border-border text-muted'
+        }`}>
+          {marketAvailable === true
+            ? <span className="h-1.5 w-1.5 rounded-full bg-[#2ad39b]" />
+            : <WifiOff className="h-3 w-3" />}
+          {marketAvailable === true ? 'MARKET DATA LIVE' : marketAvailable === false ? 'MARKET DATA OFFLINE' : 'CHECKING DATA'}
+        </div>
         <motion.button
-          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-void rounded-lg text-sm font-bold hover:bg-accent-dim transition-colors"
+          className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-bold text-[#090c10]"
         >
-          <Plus className="w-4 h-4" />
-          Nouveau Trade
+          <Plus className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">New trade</span>
         </motion.button>
       </header>
 

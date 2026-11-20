@@ -1,20 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&family=Bebas+Neue&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-display: 'Bebas Neue';
-  --font-body: 'Space Grotesk';
+  --font-display: 'Manrope';
+  --font-body: 'Manrope';
   --font-mono: 'JetBrains Mono';
+  --canvas: #090c10;
+  --canvas-raised: #0d1117;
+  --canvas-elevated: #11161d;
+  --line: #20262e;
+  --line-strong: #2b333d;
+  --text-primary: #f2f4f7;
+  --text-secondary: #9aa3af;
+  --text-tertiary: #69727f;
+  --positive: #2ad39b;
+  --negative: #f06a6a;
+  --brand: #77a9ff;
+  --brand-soft: rgba(119, 169, 255, 0.12);
 }
 
 * { box-sizing: border-box; }
 
 body {
-  background: #020408;
-  color: #e0eaf4;
+  background: var(--canvas);
+  color: var(--text-primary);
   font-family: var(--font-body), sans-serif;
   overflow-x: hidden;
 }
@@ -26,11 +38,24 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #00d4ff44; }
 
 /* Grid background */
-.bg-grid {
-  background-image: linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+.bg-grid { background: var(--canvas); }
+
+.workstation-panel {
+  background: var(--canvas-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
+
+.workstation-label {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workstation-divider { border-color: var(--line); }
 
 /* Glow effects */
 .glow-accent { box-shadow: 0 0 20px rgba(0, 212, 255, 0.15), 0 0 40px rgba(0, 212, 255, 0.05); }

@@ -111,8 +111,9 @@ export default async function MarketPage({ searchParams }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl tracking-wide text-white">MARCHÉS <span className="text-accent">RÉELS</span></h1>
-          <p className="mt-1 font-mono text-sm text-muted">Données publiques OHLC avec provenance fournisseur</p>
+          <div className="workstation-label">Market workspace</div>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">Real market analysis</h1>
+          <p className="mt-1 text-xs text-muted">OHLC provider data with explicit provenance</p>
         </div>
         <Link href={`/market?symbol=${selected.symbol}&interval=${interval}`} className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-4 py-2 font-mono text-sm text-accent">
           <RefreshCw className="h-4 w-4" />
@@ -121,14 +122,14 @@ export default async function MarketPage({ searchParams }: Props) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[260px_1fr]">
-        <aside className="rounded-2xl border border-border bg-panel p-3">
-          <div className="mb-3 px-2 text-xs font-mono uppercase text-muted">Watchlist</div>
+        <aside className="workstation-panel p-2">
+          <div className="mb-2 px-2 py-2 workstation-label">Watchlist</div>
           <div className="space-y-1">
             {SYMBOLS.map(item => (
               <Link key={item.symbol} href={`/market?symbol=${item.symbol}&interval=${interval}`}
                 className={`block w-full rounded-xl border px-3 py-3 transition-all ${selected.symbol === item.symbol ? 'border-accent/30 bg-accent/10' : 'border-transparent hover:border-border hover:bg-white/[0.02]'}`}>
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-sm font-bold text-white">{item.label}</span>
+                  <span className="font-mono text-xs font-semibold text-white">{item.label}</span>
                   <span className="text-[10px] font-mono text-muted">{item.className}</span>
                 </div>
               </Link>
@@ -140,7 +141,7 @@ export default async function MarketPage({ searchParams }: Props) {
           </div>
         </aside>
 
-        <div className="rounded-2xl border border-border bg-panel p-5">
+        <div className="workstation-panel min-w-0 p-4">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-2xl tracking-wide text-white">{selected.label}</h2>

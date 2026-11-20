@@ -4,7 +4,6 @@ import { useTradingStore } from '@/store/tradingStore'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { Toaster } from 'react-hot-toast'
-import { DataProvenanceBanner } from './DataProvenanceBanner'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const loadAll = useTradingStore(s => s.loadAll)
@@ -14,23 +13,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [loadAll])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-void bg-grid">
-      {/* Ambient glows */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full opacity-[0.04] blur-3xl"
-          style={{ background: 'radial-gradient(circle, #00d4ff, transparent)' }} />
-        <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full opacity-[0.03] blur-3xl"
-          style={{ background: 'radial-gradient(circle, #00ff88, transparent)' }} />
-      </div>
-
+    <div className="flex h-screen overflow-hidden bg-void">
       <Sidebar />
-
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-auto p-6 relative">
-          <div className="mb-6">
-            <DataProvenanceBanner />
-          </div>
+        <main className="relative flex-1 overflow-auto px-4 py-5 sm:px-5 lg:px-6">
           {children}
         </main>
       </div>

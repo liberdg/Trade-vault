@@ -16,14 +16,15 @@ export default async function SignalsPage() {
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1500px] space-y-4">
       <div>
-        <h1 className="font-display text-4xl tracking-wide text-white">SIGNAL <span className="text-accent">CENTER</span></h1>
-        <p className="mt-1 font-mono text-sm text-muted">Analyses calculées depuis les bougies H1 réellement récupérées</p>
+        <div className="workstation-label">Setup intelligence</div>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">Signal center</h1>
+        <p className="mt-1 text-xs text-muted">Explainable H1 analysis from retrieved real candles</p>
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         {candidates.map(item => (
-          <div key={item.symbol} className="rounded-2xl border border-border bg-panel p-5">
+          <div key={item.symbol} className="workstation-panel p-4">
             {item.available && item.analysis ? (
               <>
                 <div className="flex items-center justify-between">

@@ -80,11 +80,12 @@ export default async function BrokerPage() {
   const status = await getBrokerStatus()
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1500px] space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl tracking-wide text-white">CONNEXION <span className="text-accent">BROKER</span></h1>
-          <p className="mt-1 font-mono text-sm text-muted">OANDA v20 — lecture de compte et exécution explicite</p>
+          <div className="workstation-label">Execution control</div>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">Broker accounts</h1>
+          <p className="mt-1 text-xs text-muted">OANDA v20 — authenticated account and order control</p>
         </div>
         <a href="/broker" className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-4 py-2 font-mono text-sm text-accent">
           <RefreshCw className="h-4 w-4" />
@@ -92,7 +93,7 @@ export default async function BrokerPage() {
         </a>
       </div>
 
-      <div className="rounded-2xl border border-border bg-panel p-5">
+      <div className="workstation-panel p-4">
         {status.connected ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <StatusMetric label="Environnement" value={status.environment === 'practice' ? 'Practice' : 'Live'} positive={status.environment === 'practice'} />

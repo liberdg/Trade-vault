@@ -45,12 +45,13 @@ export default async function ScannerPage() {
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1500px] space-y-4">
       <div>
-        <h1 className="font-display text-4xl tracking-wide text-white">MARKET <span className="text-accent">SCANNER</span></h1>
-        <p className="mt-1 font-mono text-sm text-muted">Analyse déterministe H1 des bougies Binance réelles</p>
+        <div className="workstation-label">Market intelligence</div>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">Market scanner</h1>
+        <p className="mt-1 text-xs text-muted">Deterministic H1 analysis from Binance OHLC</p>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-border bg-panel">
+      <div className="workstation-panel overflow-hidden">
         {results.map(result => (
           <Link key={result.symbol} href={`/market?symbol=${result.symbol}&interval=1h`}
             className="grid gap-3 border-b border-border px-5 py-4 last:border-0 hover:bg-white/[0.02] md:grid-cols-[1fr_120px_120px_100px_1fr]">

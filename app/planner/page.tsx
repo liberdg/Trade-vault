@@ -24,13 +24,14 @@ export default function PlannerPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1500px] space-y-4">
       <div>
-        <h1 className="font-display text-4xl tracking-wide text-white">PLANIFICATEUR <span className="text-accent">DE RISQUE</span></h1>
-        <p className="mt-1 font-mono text-sm text-muted">Calcul explicite avant toute soumission à un broker</p>
+        <div className="workstation-label">Capital protection</div>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">Trade plan & risk</h1>
+        <p className="mt-1 text-xs text-muted">Explicit sizing before any broker submission</p>
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="rounded-2xl border border-border bg-panel p-5">
+        <div className="workstation-panel p-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Solde compte"><input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)} className="market-input" /></Field>
             <Field label="Risque (%)"><input type="number" step="0.1" value={riskPercent} onChange={e => setRiskPercent(e.target.value)} className="market-input" /></Field>
