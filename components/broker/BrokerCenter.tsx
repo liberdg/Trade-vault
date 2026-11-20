@@ -16,6 +16,8 @@ export function BrokerCenter() {
   const [nickname, setNickname] = useState('')
   const [derivAppId, setDerivAppId] = useState('')
   const [derivToken, setDerivToken] = useState('')
+  const [derivAccounts, setDerivAccounts] = useState<Array<{ accountId: string; environment: 'demo' | 'real'; currency?: string; accountType?: string }>>([])
+  const [selectedDerivAccountId, setSelectedDerivAccountId] = useState('')
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ status: string; message: string; accountId?: string } | null>(null)
   const [connections, setConnections] = useState<BrokerConnection[]>([])
@@ -33,6 +35,7 @@ export function BrokerCenter() {
     setSelected(entry)
     setConnectionType(entry.connectionTypes[0])
     setTestResult(null)
+    if (entry.id !== 'deriv') { setDerivAccounts([]); setSelectedDerivAccountId('') }
   }
 
   const testConnection = async () => {
@@ -46,7 +49,7 @@ export function BrokerCenter() {
       const response = await fetch('/api/broker/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brokerId: selected.id, connectionType, environment, ...(selected.id === 'deriv' ? { appId: derivAppId.trim(), token: derivToken.trim() } : {}) }),
+        body: JSON.stringify({ brokerId: selected.id, connectionType, environment, ...(selected.id === 'deriv' ? { appId: derivAppId.trim(), token: derivToken.trim(), ...(selectedDerivAccountId ? { accountId: selectedDerivAccountId } : {}) } : {}) }),
       })
       const result = await response.json()
       if (!response.ok) {
@@ -58,6 +61,11 @@ export function BrokerCenter() {
         return
       }
       setTestResult(result)
+      if (selected.id === 'deriv' && Array.isArray(result.accounts)) {
+        const discovered = result.accounts.filter((account: unknown) => account && typeof account === 'object' && 'accountId' in account && 'environment' in account) as typeof derivAccounts
+        setDerivAccounts(discovered)
+        if (!selectedDerivAccountId && result.accountId) setSelectedDerivAccountId(String(result.accountId))
+      }
       if (result.status === 'connected') {
         const existing = connections.find(connection =>
           connection.brokerId === selected.id &&
@@ -222,6 +230,17 @@ export function BrokerCenter() {
               <input value={nickname} onChange={event => setNickname(event.target.value)} placeholder="EXNESS MAIN" className="market-input" />
             </Field>
           </div>
+
+          {selected.id === 'deriv' && derivAccounts.length > 0 && (
+            <div className="mt-4 rounded-lg border border-border bg-[#090c10] p-3">
+              <Field label={`Authorized Deriv accounts (${derivAccounts.length})`}>
+                <select value={selectedDerivAccountId} onChange={event => { setSelectedDerivAccountId(event.target.value); const account = derivAccounts.find(item => item.accountId === event.target.value); if (account) setEnvironment(account.environment); setTestResult(null) }} className="market-input">
+                  {derivAccounts.map(account => <option key={account.accountId} value={account.accountId}>{account.accountId} · {account.environment.toUpperCase()} {account.currency ? `· ${account.currency}` : ''}</option>)}
+                </select>
+              </Field>
+              <p className="mt-2 text-[10px] text-muted">Select the exact account you want to verify and use for trading. Click Test & connect after changing selection.</p>
+            </div>
+          )}
 
           {selected.id === 'deriv' && (
             <div className="mt-4 grid gap-3 rounded-lg border border-accent/20 bg-[#090c10] p-4">
