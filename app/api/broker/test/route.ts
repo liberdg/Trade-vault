@@ -24,12 +24,9 @@ async function testOanda() {
   }
 }
 
-async function testDeriv() {
-  const appId = process.env.DERIV_APP_ID
-  const token = process.env.DERIV_API_TOKEN
-  if (!appId || !token) return { status: 'disconnected', message: 'DERIV_APP_ID and DERIV_API_TOKEN are not configured on the server.' }
+async function testDeriv(token: string, appId: string)
 
-  return await new Promise<{ status: string; message: string; accountId?: string; currency?: string }>((resolve) => {
+  return await new Promise<{ status: string; message: string; accountId?: string; currency?: string; environment?: 'demo' | 'real' }>((resolve) => {
     let settled = false
     let socket: WebSocket
     try {
@@ -67,6 +64,7 @@ async function testDeriv() {
             message: 'Deriv authorization succeeded.',
             accountId: data.authorize.loginid,
             currency: data.authorize.currency,
+            environment: data.authorize.is_virtual ? 'demo' : 'real',
           })
         }
       } catch {
@@ -121,6 +119,9 @@ export async function POST(request: NextRequest) {
 
   const brokerId = typeof body === 'object' && body !== null && 'brokerId' in body ? body.brokerId : undefined
   const connectionType = typeof body === 'object' && body !== null && 'connectionType' in body ? body.connectionType : undefined
+  const token = typeof body === 'object' && body !== null && 'token' in body && typeof body.token === 'string' ? body.token.trim() : ''
+  const appId = typeof body === 'object' && body !== null && 'appId' in body && typeof body.appId === 'string' ? body.appId.trim() : ''
+  const environment = typeof body === 'object' && body !== null && 'environment' in body && body.environment === 'real' ? 'real' : 'demo'
   const validation = validateBrokerConnectionRequest(brokerId, connectionType)
   if (!validation.valid) {
     return NextResponse.json({ status: 'invalid_request', message: validation.message }, { status: 400 })
@@ -129,7 +130,12 @@ export async function POST(request: NextRequest) {
   let result
   try {
     if (brokerId === 'oanda' && connectionType === 'official_api') result = await testOanda()
-    else if (brokerId === 'deriv' && connectionType === 'official_api') result = await testDeriv()
+    else if (brokerId === 'deriv' && connectionType === 'official_api') {
+      if (!appId || !token) result = { status: 'invalid_request', message: 'Deriv App ID and Personal Access Token are required.' }
+      else {
+        result = await testDeriv(token, appId)
+        if (result.status === 'connected' && result.environment !== environment) result = { status: 'account_environment_mismatch', message: `The token authenticated a ${result.environment} account, but ${environment} was selected.`, accountId: result.accountId }
+      }
     else if (['mt5', 'mt4', 'exness'].includes(brokerId as string) && ['mt5_bridge', 'mt4_bridge'].includes(connectionType as string)) result = await testMt5()
     else if (brokerId === 'exness' && connectionType === 'official_api') {
       result = { status: 'permission_error', message: 'Exness official API eligibility and credentials must be provided through a verified Exness API integration. Standard MT accounts are not assumed eligible.' }

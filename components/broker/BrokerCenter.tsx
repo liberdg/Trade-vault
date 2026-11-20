@@ -14,6 +14,8 @@ export function BrokerCenter() {
   const [connectionType, setConnectionType] = useState<BrokerConnectionType>(BROKER_CATALOG[0].connectionTypes[0])
   const [environment, setEnvironment] = useState<'demo' | 'real'>('demo')
   const [nickname, setNickname] = useState('')
+  const [derivAppId, setDerivAppId] = useState('')
+  const [derivToken, setDerivToken] = useState('')
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ status: string; message: string; accountId?: string } | null>(null)
   const [connections, setConnections] = useState<BrokerConnection[]>([])
@@ -34,13 +36,17 @@ export function BrokerCenter() {
   }
 
   const testConnection = async () => {
+    if (selected.id === 'deriv' && (!derivAppId.trim() || !derivToken.trim())) {
+      setTestResult({ status: 'invalid_request', message: 'Enter your Deriv App ID and Personal Access Token to test this connection.' })
+      return
+    }
     setTesting(true)
     setTestResult(null)
     try {
       const response = await fetch('/api/broker/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brokerId: selected.id, connectionType }),
+        body: JSON.stringify({ brokerId: selected.id, connectionType, environment, ...(selected.id === 'deriv' ? { appId: derivAppId.trim(), token: derivToken.trim() } : {}) }),
       })
       const result = await response.json()
       if (!response.ok) {
@@ -96,6 +102,12 @@ export function BrokerCenter() {
   }
 
   const reconnectConnection = async (connection: BrokerConnection) => {
+    if (connection.brokerId === 'deriv') {
+      const deriv = BROKER_CATALOG.find(entry => entry.id === 'deriv')
+      if (deriv) selectBroker(deriv)
+      setTestResult({ status: 'credentials_required', message: 'Deriv tokens are not stored locally. Re-enter your App ID and Personal Access Token, then use Test & connect.' })
+      return
+    }
     setTesting(true)
     setTestResult(null)
     try {
@@ -211,15 +223,27 @@ export function BrokerCenter() {
             </Field>
           </div>
 
+          {selected.id === 'deriv' && (
+            <div className="mt-4 grid gap-3 rounded-lg border border-accent/20 bg-[#090c10] p-4">
+              <Field label="Deriv App ID">
+                <input value={derivAppId} onChange={event => setDerivAppId(event.target.value)} inputMode="numeric" placeholder="Your Deriv application ID" className="market-input" autoComplete="off" />
+              </Field>
+              <Field label="Personal Access Token">
+                <input value={derivToken} onChange={event => setDerivToken(event.target.value)} type="password" placeholder="Paste your Deriv API token" className="market-input" autoComplete="off" />
+              </Field>
+              <p className="text-[10px] leading-relaxed text-muted">Token is used only for this request. It is not saved in Trade-Vault local storage or sent to GitHub.</p>
+            </div>
+          )}
+
           <div className="mt-4 rounded-lg border border-border bg-[#090c10] p-4">
             <div className="flex items-start gap-2">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
               <div>
-                <div className="text-xs font-semibold text-white">Server-side credential requirement</div>
+                <div className="text-xs font-semibold text-white">Connection requirements</div>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted">{selected.warning}</p>
               </div>
             </div>
-            {selected.credentials.map(credential => (
+            {selected.id !== 'deriv' && selected.credentials.map(credential => (
               <div key={credential} className="mt-2 border-t border-border pt-2 text-[10px] font-mono text-muted">Required configuration: {credential}</div>
             ))}
           </div>
