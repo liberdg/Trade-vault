@@ -23,7 +23,7 @@ export function BrokerCenter() {
   const [connections, setConnections] = useState<BrokerConnection[]>([])
   const [activeAccount, setActiveAccount] = useState<{ brokerId: string; accountId: string; environment: 'demo' | 'real' } | null>(null)
   const [closeReport, setCloseReport] = useState('')
-  const [derivSnapshot, setDerivSnapshot] = useState<{ balance?: number; currency?: string; accountName?: string; portfolio: Array<Record<string, unknown>>; positionsCount: number; retrievedAt: string } | null>(null)
+  const [derivSnapshot, setDerivSnapshot] = useState<{ balance?: number; currency?: string; accountName?: string; portfolio: Array<Record<string, unknown>>; transactions: Array<Record<string, unknown>>; positionsCount: number; retrievedAt: string } | null>(null)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [snapshotError, setSnapshotError] = useState('')
 
@@ -379,6 +379,8 @@ export function BrokerCenter() {
                   <div className="workstation-label">Open portfolio</div>
                   {derivSnapshot.portfolio.length === 0 ? <p className="text-xs text-muted">No open positions on this account.</p> : <div className="space-y-1">{derivSnapshot.portfolio.slice(0, 10).map((contract, index) => <div key={String(contract.contract_id ?? index)} className="rounded border border-border px-2 py-2 text-xs"><div className="flex justify-between gap-2"><span className="text-white">{String(contract.contract_type ?? contract.contract_type_name ?? 'Contract')} · {String(contract.symbol ?? '')}</span><span className="font-mono">{String(contract.contract_id ?? '')}</span></div><div className="mt-1 text-muted">Buy price: {String(contract.buy_price ?? '—')} · Profit: {String(contract.profit ?? '—')} {derivSnapshot.currency || ''}</div></div>)}</div>}
                   <p className="text-[9px] text-muted">Verified at {new Date(derivSnapshot.retrievedAt).toLocaleTimeString()}</p>
+                  <div className="workstation-label">Recent account statement</div>
+                  {derivSnapshot.transactions.length === 0 ? <p className="text-xs text-muted">No statement transactions returned.</p> : <div className="space-y-1">{derivSnapshot.transactions.slice(0, 8).map((transaction, index) => <div key={String(transaction.transaction_id ?? transaction.id ?? index)} className="rounded border border-border px-2 py-2 text-[10px]"><div className="flex justify-between gap-2 text-white"><span>{String(transaction.action_type ?? transaction.transaction_type ?? transaction.type ?? 'Transaction')}</span><span className="font-mono">{String(transaction.transaction_id ?? transaction.id ?? '')}</span></div><div className="mt-1 text-muted">{String(transaction.symbol ?? transaction.description ?? '')} · {String(transaction.amount ?? transaction.balance ?? '—')} {derivSnapshot.currency || ''}</div></div>)}</div>
                 </div>
               )}
               {!derivSnapshot && !snapshotError && <p className="mt-2 text-xs text-muted">Refresh to fetch verified balance and open positions from the selected Deriv account. Credentials remain in page memory and are not stored by this snapshot endpoint.</p>}
