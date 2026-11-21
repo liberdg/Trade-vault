@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, ChartNoAxesCombined, CircleAlert, ShieldCheck } from 'lucide-react'
+import { ArrowRight, ChartNoAxesCombined, CircleAlert, ShieldCheck, RefreshCw, Wallet, Activity, AlertTriangle } from 'lucide-react'
 import { useTradingStore } from '@/store/tradingStore'
 import { computeAnalytics } from '@/lib/analytics'
 import { MarketWatchlist } from '@/components/dashboard/MarketWatchlist'
@@ -26,8 +26,7 @@ export default function DashboardPage() {
     }).catch(() => { if (!cancelled) setBrokerLoaded(true) })
     return () => { cancelled = true }
   }, [])
-  const activeConnection = brokerConnections.find(connection => connection.status === 'connected' && connection.brokerId === activeBrokerAccount?.brokerId && connection.accountId === activeBrokerAccount?.accountId && connection.environment === activeBrokerAccount?.environment)
-    ?? brokerConnections.find(connection => connection.status === 'connected')
+  const activeConnection = activeBrokerAccount ? brokerConnections.find(connection => connection.status === 'connected' && connection.brokerId === activeBrokerAccount.brokerId && connection.accountId === activeBrokerAccount.accountId && connection.environment === activeBrokerAccount.environment) : undefined
   const analytics = useMemo(() => computeAnalytics(trades), [trades])
   const equity = settings.accountBalance + analytics.totalPnl
 
@@ -45,13 +44,13 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
-        <Metric label="Journal equity" value={`$${equity.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} detail={`${analytics.totalPnl >= 0 ? '+' : ''}${analytics.totalPnl.toFixed(2)} USD`} />
+        <Metric label="Journal equity (local)" value={`${equity.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} detail={`${analytics.totalPnl >= 0 ? '+' : ''}${analytics.totalPnl.toFixed(2)} USD · journal only`} />
         <Metric label="Closed trades" value={String(analytics.totalTrades)} detail={analytics.totalTrades === 0 ? 'No executed history' : `${analytics.winRate.toFixed(1)}% win rate`} />
         <Metric label="Profit factor" value={analytics.profitFactor === 999 ? '∞' : analytics.profitFactor.toFixed(2)} detail="Gross profit / gross loss" />
         <Metric label="Open exposure" value={String(trades.filter(trade => trade.status === 'OPEN').length)} detail="Journal positions only" />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
+      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId ? <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} /> : <BrokerAccountSummary connection={activeConnection} loaded={brokerLoaded} />}\n\n      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
         <div className="workstation-panel min-w-0 p-4">
           <div className="flex h-8 items-start justify-between">
             <div>
