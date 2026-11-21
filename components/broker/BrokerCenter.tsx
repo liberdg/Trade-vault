@@ -28,6 +28,8 @@ export function BrokerCenter() {
   useEffect(() => {
     db.brokerConnections.toArray().then(setConnections)
     getSettings().then(settings => {
+      setDerivAppId(settings.derivAppId ?? '')
+      setDerivToken(settings.derivToken ?? '')
       const active = settings.activeBrokerAccount ?? null
       setActiveAccount(active)
       if (active) {
@@ -101,7 +103,7 @@ export function BrokerCenter() {
         }
         await db.brokerConnections.put(connection)
         const nextActive = { brokerId: connection.brokerId, accountId: connection.accountId!, environment: connection.environment }
-        await updateSettings({ activeBrokerAccount: nextActive })
+        await updateSettings({ activeBrokerAccount: nextActive, ...(selected.id === 'deriv' ? { derivAppId: derivAppId.trim(), derivToken: derivToken.trim() } : {}) })
         setActiveAccount(nextActive)
         setConnections(await db.brokerConnections.toArray())
       }
@@ -136,7 +138,7 @@ export function BrokerCenter() {
     if (connection.brokerId === 'deriv') {
       const deriv = BROKER_CATALOG.find(entry => entry.id === 'deriv')
       if (deriv) selectBroker(deriv)
-      setTestResult({ status: 'credentials_required', message: 'Deriv tokens are not stored locally. Re-enter your App ID and Personal Access Token, then use Test & connect.' })
+      setTestResult({ status: 'credentials_required', message: derivAppId.trim() && derivToken.trim() ? 'Stored Deriv credentials are available. Use Test & connect to verify this account.' : 'Saved Deriv credentials are missing. Enter App ID and Personal Access Token, then use Test & connect.' })
       return
     }
     setTesting(true)
