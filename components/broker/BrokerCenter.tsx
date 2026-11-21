@@ -337,9 +337,14 @@ export function BrokerCenter() {
               </div>
             ))}
           </div>
-          {activeAccount?.brokerId === 'deriv' && <DerivAccountPanel appId={derivAppId} token={derivToken} accountId={activeAccount.accountId} environment={activeAccount.environment} />}
         </aside>
       </div>
+
+
+      {activeAccount?.brokerId === 'deriv' && (
+        <DerivAccountPanel appId={derivAppId} token={derivToken} accountId={activeAccount.accountId} environment={activeAccount.environment} />
+      )}
+
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="workstation-panel p-4">
