@@ -11,6 +11,7 @@ type DerivSnapshot = {
   portfolio: Array<Record<string, unknown>>
   transactions: Array<Record<string, unknown>>
   positionsCount: number
+  status?: string
   retrievedAt: string
 }
 
@@ -96,7 +97,7 @@ export function DerivAccountPanel({ appId, token, accountId, environment }: Prop
 
           <div>
             <div className="flex items-center gap-1 workstation-label"><History className="h-3 w-3" /> RECENT STATEMENT</div>
-            {snapshot.transactions.length === 0 ? <p className="mt-1 text-[10px] text-muted">No statement transactions returned.</p> : <div className="mt-1 space-y-1">{snapshot.transactions.slice(0, 8).map((tx, index) => <div key={display(tx.transaction_id ?? tx.id, String(index))} className="rounded border border-border px-2 py-2 text-[10px]"><div className="flex justify-between gap-2 text-white"><span>{display(tx.action_type ?? tx.transaction_type ?? tx.type, 'Transaction')}</span><span className="font-mono">{display(tx.transaction_id ?? tx.id)}</span></div><div className="mt-1 text-muted">{display(tx.symbol ?? tx.description)} · {display(tx.amount ?? tx.balance)} {snapshot.currency || ''}</div></div>)}</div>}
+            {snapshot.transactions.length === 0 ? <p className="mt-1 text-[10px] text-muted">No statement transactions returned.</p> : <div className="mt-1 space-y-1">{snapshot.transactions.slice(0, 8).map((tx, index) => <div key={display(tx.transaction_id ?? tx.id, String(index))} className="rounded border border-border px-2 py-2 text-[10px]"><div className="flex justify-between gap-2 text-white"><span>{display(tx.action_type ?? tx.transaction_type ?? tx.type, 'Transaction')}</span><span className="font-mono">{display(tx.transaction_id ?? tx.id)}</span></div><div className="mt-1 text-muted">{display(tx.underlying_symbol ?? tx.symbol ?? tx.shortcode ?? tx.longcode)} · Amount: {display(tx.amount)} {display(tx.currency, snapshot.currency || '')}</div><div className="mt-1 flex flex-wrap gap-x-3 text-muted">{tx.balance_after !== undefined && <span>Balance after: {display(tx.balance_after)} {display(tx.currency, snapshot.currency || '')}</span>}{typeof tx.transaction_time === 'number' && <span>{new Date(tx.transaction_time * 1000).toLocaleString()}</span>}{tx.contract_id !== undefined && tx.contract_id !== null && <span>Contract: {display(tx.contract_id)}</span>}</div></div>)}</div>}
           </div>
           <div className="text-[9px] text-muted">Data received {new Date(snapshot.retrievedAt).toLocaleTimeString()}</div>
           <DerivMarketTicket currency={snapshot.currency || ''} />
