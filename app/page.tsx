@@ -183,9 +183,9 @@ function DerivDashboardLive({ accountId, environment, nickname, savedAppId, save
         <div><div className="workstation-label">Selected broker account · live data</div><div className="mt-1 text-sm font-semibold text-white">{nickname} · {accountId}</div><div className="mt-1 font-mono text-[9px] text-muted">{environment.toUpperCase()} · ACTIVE ACCOUNT</div></div>
         <button onClick={syncLive} disabled={loading} className="inline-flex items-center gap-1.5 rounded border border-accent/30 px-3 py-2 text-[10px] font-mono text-accent disabled:opacity-50"><RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} /> {loading ? 'Syncing…' : snapshot ? 'Refresh live data' : 'Connect live data'}</button>
       </div>
-      {!snapshot && <div className="grid gap-2 sm:grid-cols-2">
+      {!snapshot && savedAppId && savedToken ? <div className="rounded border border-border bg-[#0b1118] px-3 py-2 text-[10px] text-muted">Deriv credentials saved on this device. Live account data syncs automatically. <Link href="/broker" className="ml-1 text-accent">Manage broker connection</Link></div> : !snapshot && <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-[10px] text-muted">Deriv App ID<input value={appId} onChange={e => setAppId(e.target.value)} className="mt-1 w-full rounded border border-border bg-[#0b1118] px-3 py-2 text-xs text-white outline-none focus:border-accent" placeholder="Application ID" /></label>
-        <label className="text-[10px] text-muted">Personal Access Token<input type="password" value={token} onChange={e => setToken(e.target.value)} className="mt-1 w-full rounded border border-border bg-[#0b1118] px-3 py-2 text-xs text-white outline-none focus:border-accent" placeholder="Token (not saved)" /></label>
+        <label className="text-[10px] text-muted">Personal Access Token<input type="password" value={token} onChange={e => setToken(e.target.value)} className="mt-1 w-full rounded border border-border bg-[#0b1118] px-3 py-2 text-xs text-white outline-none focus:border-accent" placeholder="Token" /></label>
       </div>}
       {error && <div className="flex items-start gap-2 rounded border border-[#f2bd66]/20 bg-[#f2bd66]/5 p-2 text-[10px] text-[#f2bd66]"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0"/>{error}</div>}
       {snapshot && <div className="space-y-3">
@@ -196,7 +196,7 @@ function DerivDashboardLive({ accountId, environment, nickname, savedAppId, save
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted"><span>{snapshot.portfolio.length} open contract(s) · Live account data</span><span>Synced {new Date(snapshot.retrievedAt).toLocaleTimeString()}</span></div>
         {snapshot.portfolio.length > 0 && <div className="space-y-1"><div className="workstation-label">Open positions</div>{snapshot.portfolio.slice(0,5).map((p,i)=><div key={String(p.contract_id ?? i)} className="flex flex-wrap justify-between gap-2 rounded border border-border px-3 py-2 text-[10px]"><span className="text-white">{String(p.contract_type ?? 'Contract')} · {String(p.symbol ?? '—')}</span><span className="font-mono text-muted">ID {String(p.contract_id ?? '—')}</span><span className="font-mono text-white">P/L {String(p.profit ?? '—')} {snapshot.currency}</span></div>)}</div>}
-        <div className="text-[9px] text-muted">Credentials remain in this page's memory only; they are not persisted.</div>
+        <div className="text-[9px] text-muted">Deriv credentials are saved in this browser's local IndexedDB settings. They are not sent to Trade-Vault servers for storage, but local browser storage is not encrypted.</div>
         <button onClick={()=>{setSnapshot(null);setToken('')}} className="text-[10px] font-mono text-accent">Edit credentials / reset live snapshot</button>
       </div>}
     </section>
