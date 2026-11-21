@@ -50,7 +50,7 @@ export default function DashboardPage() {
         <Metric label="Open exposure" value={String(trades.filter(trade => trade.status === 'OPEN').length)} detail="Journal positions only" />
       </div>
 
-      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} />}
+      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} savedAppId={settings.derivAppId} savedToken={settings.derivToken} />}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
         <div className="workstation-panel min-w-0 p-4">
@@ -142,12 +142,13 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
 }
 
 
-function DerivDashboardLive({ accountId, environment, nickname }: { accountId: string; environment: 'demo' | 'real'; nickname: string }) {
-  const [appId, setAppId] = useState('')
-  const [token, setToken] = useState('')
+function DerivDashboardLive({ accountId, environment, nickname, savedAppId, savedToken }: { accountId: string; environment: 'demo' | 'real'; nickname: string; savedAppId?: string; savedToken?: string }) {
+  const [appId, setAppId] = useState(savedAppId ?? '')
+  const [token, setToken] = useState(savedToken ?? '')
   const [snapshot, setSnapshot] = useState<{ balance: number; currency: string; portfolio: Array<Record<string, unknown>>; transactions: Array<Record<string, unknown>>; retrievedAt: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const autoSyncStarted = useState(false)
   const floating = snapshot?.portfolio.reduce((sum, contract) => {
     const value = Number(contract.profit)
     return sum + (Number.isFinite(value) ? value : 0)
