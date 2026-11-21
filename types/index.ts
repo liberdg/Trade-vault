@@ -107,6 +107,8 @@ export interface UserSettings {
   goals: Goal[]
   dashboardLayout: string[]
   activeBrokerAccount?: { brokerId: string; accountId: string; environment: 'demo' | 'real' }
+  derivAppId?: string
+  derivToken?: string
 }
 
 export interface AnalyticsData {
