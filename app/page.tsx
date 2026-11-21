@@ -50,7 +50,7 @@ export default function DashboardPage() {
         <Metric label="Open exposure" value={String(trades.filter(trade => trade.status === 'OPEN').length)} detail="Journal positions only" />
       </div>
 
-      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId ? <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} /> : <BrokerAccountSummary connection={activeConnection} loaded={brokerLoaded} />}\n\n      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
+      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} />}\n\n      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
         <div className="workstation-panel min-w-0 p-4">
           <div className="flex h-8 items-start justify-between">
             <div>
@@ -136,5 +136,57 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
       <div className="mt-3 font-mono text-lg font-semibold text-white">{value}</div>
       <div className="mt-1 text-[10px] text-muted">{detail}</div>
     </div>
+  )
+}
+
+
+function DerivDashboardLive({ accountId, environment, nickname }: { accountId: string; environment: 'demo' | 'real'; nickname: string }) {
+  const [appId, setAppId] = useState('')
+  const [token, setToken] = useState('')
+  const [snapshot, setSnapshot] = useState<{ balance: number; currency: string; portfolio: Array<Record<string, unknown>>; transactions: Array<Record<string, unknown>>; retrievedAt: string } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const floating = snapshot?.portfolio.reduce((sum, contract) => {
+    const value = Number(contract.profit)
+    return sum + (Number.isFinite(value) ? value : 0)
+  }, 0) ?? 0
+  const equityEstimate = snapshot ? snapshot.balance + floating : undefined
+  const fmt = (value: number, currency: string) => `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`
+
+  async function syncLive() {
+    if (!appId.trim() || !token.trim()) { setError('Enter the Deriv App ID and Personal Access Token to request live account data.'); return }
+    setLoading(true); setError('')
+    try {
+      const response = await fetch('/api/broker/deriv/account-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ appId: appId.trim(), token: token.trim(), accountId, environment }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Live account data request failed.')
+      setSnapshot(result); setToken('')
+    } catch (err) { setSnapshot(null); setError(err instanceof Error ? err.message : 'Live sync failed.') }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <section className="workstation-panel p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><div className="workstation-label">Selected broker account · live data</div><div className="mt-1 text-sm font-semibold text-white">{nickname} · {accountId}</div><div className="mt-1 font-mono text-[9px] text-muted">{environment.toUpperCase()} · ACTIVE ACCOUNT</div></div>
+        <button onClick={syncLive} disabled={loading} className="inline-flex items-center gap-1.5 rounded border border-accent/30 px-3 py-2 text-[10px] font-mono text-accent disabled:opacity-50"><RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} /> {loading ? 'Syncing…' : snapshot ? 'Refresh live data' : 'Connect live data'}</button>
+      </div>
+      {!snapshot && <div className="grid gap-2 sm:grid-cols-2">
+        <label className="text-[10px] text-muted">Deriv App ID<input value={appId} onChange={e => setAppId(e.target.value)} className="mt-1 w-full rounded border border-border bg-[#0b1118] px-3 py-2 text-xs text-white outline-none focus:border-accent" placeholder="Application ID" /></label>
+        <label className="text-[10px] text-muted">Personal Access Token<input type="password" value={token} onChange={e => setToken(e.target.value)} className="mt-1 w-full rounded border border-border bg-[#0b1118] px-3 py-2 text-xs text-white outline-none focus:border-accent" placeholder="Token (not saved)" /></label>
+      </div>}
+      {error && <div className="flex items-start gap-2 rounded border border-[#f2bd66]/20 bg-[#f2bd66]/5 p-2 text-[10px] text-[#f2bd66]"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0"/>{error}</div>}
+      {snapshot && <div className="space-y-3">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded border border-border bg-[#0b1118] p-3"><div className="workstation-label flex items-center gap-1"><Wallet className="h-3 w-3"/> BALANCE</div><div className="mt-2 font-mono text-lg text-white">{fmt(snapshot.balance, snapshot.currency)}</div></div>
+          <div className="rounded border border-border bg-[#0b1118] p-3"><div className="workstation-label flex items-center gap-1"><Activity className="h-3 w-3"/> OPEN P/L</div><div className={`mt-2 font-mono text-lg ${floating >= 0 ? 'text-[#2ad39b]' : 'text-[#ff647c'}`}>{fmt(floating, snapshot.currency)}</div><div className="text-[9px] text-muted">Sum of reported contract profits</div></div>
+          <div className="rounded border border-border bg-[#0b1118] p-3"><div className="workstation-label">EST. EQUITY</div><div className="mt-2 font-mono text-lg text-white">{fmt(equityEstimate ?? snapshot.balance, snapshot.currency)}</div><div className="text-[9px] text-muted">Balance + open P/L estimate</div></div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted"><span>{snapshot.portfolio.length} open contract(s) · Live account data</span><span>Synced {new Date(snapshot.retrievedAt).toLocaleTimeString()}</span></div>
+        {snapshot.portfolio.length > 0 && <div className="space-y-1"><div className="workstation-label">Open positions</div>{snapshot.portfolio.slice(0,5).map((p,i)=><div key={String(p.contract_id ?? i)} className="flex flex-wrap justify-between gap-2 rounded border border-border px-3 py-2 text-[10px]"><span className="text-white">{String(p.contract_type ?? 'Contract')} · {String(p.symbol ?? '—')}</span><span className="font-mono text-muted">ID {String(p.contract_id ?? '—')}</span><span className="font-mono text-white">P/L {String(p.profit ?? '—')} {snapshot.currency}</span></div>)}</div>}
+        <div className="text-[9px] text-muted">Token is not stored in this Dashboard. Refresh requires re-entering the token for security.</div>
+        <button onClick={()=>{setSnapshot(null);setToken('')}} className="text-[10px] font-mono text-accent">Change credentials / account data</button>
+      </div>}
+    </section>
   )
 }
