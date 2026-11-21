@@ -50,7 +50,9 @@ export default function DashboardPage() {
         <Metric label="Open exposure" value={String(trades.filter(trade => trade.status === 'OPEN').length)} detail="Journal positions only" />
       </div>
 
-      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} />}\n\n      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
+      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} />}
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
         <div className="workstation-panel min-w-0 p-4">
           <div className="flex h-8 items-start justify-between">
             <div>
