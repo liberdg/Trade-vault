@@ -16,12 +16,14 @@ export default function DashboardPage() {
   const [brokerConnections, setBrokerConnections] = useState<BrokerConnection[]>([])
   const [activeBrokerAccount, setActiveBrokerAccount] = useState<UserSettings['activeBrokerAccount']>()
   const [brokerLoaded, setBrokerLoaded] = useState(false)
+  const [savedDerivCredentials, setSavedDerivCredentials] = useState<{ appId?: string; token?: string }>({})
   useEffect(() => {
     let cancelled = false
     Promise.all([db.brokerConnections.toArray(), getSettings()]).then(([connections, userSettings]) => {
       if (cancelled) return
       setBrokerConnections(connections)
       setActiveBrokerAccount(userSettings.activeBrokerAccount)
+      setSavedDerivCredentials({ appId: userSettings.derivAppId, token: userSettings.derivToken })
       setBrokerLoaded(true)
     }).catch(() => { if (!cancelled) setBrokerLoaded(true) })
     return () => { cancelled = true }
@@ -50,7 +52,7 @@ export default function DashboardPage() {
         <Metric label="Open exposure" value={String(trades.filter(trade => trade.status === 'OPEN').length)} detail="Journal positions only" />
       </div>
 
-      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} savedAppId={settings.derivAppId} savedToken={settings.derivToken} />}
+      {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} savedAppId={savedDerivCredentials.appId} savedToken={savedDerivCredentials.token} />}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.45fr)]">
         <div className="workstation-panel min-w-0 p-4">
@@ -167,6 +169,13 @@ function DerivDashboardLive({ accountId, environment, nickname, savedAppId, save
     } catch (err) { setSnapshot(null); setError(err instanceof Error ? err.message : 'Live sync failed.') }
     finally { setLoading(false) }
   }
+
+  useEffect(() => {
+    if (savedAppId?.trim() && savedToken?.trim() && !snapshot && !loading) {
+      syncLive()
+    }
+  // Auto-fetch once credentials/account are loaded; changing the account triggers a fresh snapshot.
+  }, [accountId, environment, savedAppId, savedToken])
 
   return (
     <section className="workstation-panel p-4 space-y-3">
