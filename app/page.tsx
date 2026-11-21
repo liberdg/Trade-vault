@@ -104,7 +104,7 @@ function BrokerStatusCard({ connection, loaded, count }: { connection?: BrokerCo
   return (
     <div className="workstation-panel p-4">
       <div className="flex items-start gap-3">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${connection ? 'border-[#2ad39b]/20 bg-[#2ad39b]/10' : 'border-[#f2bd66]/20 bg-[#f2bd66]/10'}>`}>
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${connection ? 'border-[#2ad39b]/20 bg-[#2ad39b]/10' : 'border-[#f2bd66]/20 bg-[#f2bd66]/10'}`}>
           {connection ? <ShieldCheck className="h-4 w-4 text-[#2ad39b]" /> : <CircleAlert className="h-4 w-4 text-[#f2bd66]" />}
         </div>
         <div className="min-w-0 flex-1">
