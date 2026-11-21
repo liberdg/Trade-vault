@@ -5,6 +5,31 @@ export const runtime = 'nodejs'
 
 type DerivWsMessage = Record<string, unknown>
 
+function numericValue(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function normalizeStatementTransaction(value: unknown): Record<string, unknown> {
+  const tx = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    action_type: tx.action_type,
+    amount: numericValue(tx.amount),
+    balance_after: numericValue(tx.balance_after),
+    transaction_id: tx.transaction_id,
+    transaction_time: numericValue(tx.transaction_time),
+    currency: tx.currency,
+    contract_id: tx.contract_id,
+    shortcode: tx.shortcode,
+    longcode: tx.longcode,
+    underlying_symbol: tx.underlying_symbol ?? tx.symbol,
+  }
+}
+
 function openSocket(url: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     let settled = false
@@ -96,12 +121,16 @@ export async function POST(request: NextRequest) {
     const portfolio = portfolioMessage.portfolio && typeof portfolioMessage.portfolio === 'object' ? portfolioMessage.portfolio as Record<string, unknown> : null
     const contracts = Array.isArray(portfolio?.contracts) ? portfolio.contracts : []
     const statement = statementMessage.statement && typeof statementMessage.statement === 'object' ? statementMessage.statement as Record<string, unknown> : null
-    const transactions = Array.isArray(statement?.transactions) ? statement.transactions : []
+    const transactions = Array.isArray(statement?.transactions) ? statement.transactions.map(normalizeStatementTransaction) : []
+    const normalizedBalance = numericValue(balance?.balance)
+    if (normalizedBalance === undefined || typeof balance?.currency !== 'string' || !balance.currency) {
+      return NextResponse.json({ error: 'Deriv session authenticated, but its balance response was incomplete. No placeholder balance was returned.' }, { status: 502 })
+    }
     return NextResponse.json({
       status: 'verified',
       accountId,
       environment,
-      balance: balance?.balance,
+      balance: normalizedBalance,
       currency: balance?.currency,
       accountName: balance?.loginid,
       portfolio: contracts,
