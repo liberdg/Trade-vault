@@ -160,7 +160,7 @@ function DerivDashboardLive({ accountId, environment, nickname }: { accountId: s
       const response = await fetch('/api/broker/deriv/account-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ appId: appId.trim(), token: token.trim(), accountId, environment }) })
       const result = await response.json()
       if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Live account data request failed.')
-      setSnapshot(result); setToken('')
+      setSnapshot(result)
     } catch (err) { setSnapshot(null); setError(err instanceof Error ? err.message : 'Live sync failed.') }
     finally { setLoading(false) }
   }
@@ -184,8 +184,8 @@ function DerivDashboardLive({ accountId, environment, nickname }: { accountId: s
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted"><span>{snapshot.portfolio.length} open contract(s) · Live account data</span><span>Synced {new Date(snapshot.retrievedAt).toLocaleTimeString()}</span></div>
         {snapshot.portfolio.length > 0 && <div className="space-y-1"><div className="workstation-label">Open positions</div>{snapshot.portfolio.slice(0,5).map((p,i)=><div key={String(p.contract_id ?? i)} className="flex flex-wrap justify-between gap-2 rounded border border-border px-3 py-2 text-[10px]"><span className="text-white">{String(p.contract_type ?? 'Contract')} · {String(p.symbol ?? '—')}</span><span className="font-mono text-muted">ID {String(p.contract_id ?? '—')}</span><span className="font-mono text-white">P/L {String(p.profit ?? '—')} {snapshot.currency}</span></div>)}</div>}
-        <div className="text-[9px] text-muted">Token is not stored in this Dashboard. Refresh requires re-entering the token for security.</div>
-        <button onClick={()=>{setSnapshot(null);setToken('')}} className="text-[10px] font-mono text-accent">Change credentials / account data</button>
+        <div className="text-[9px] text-muted">Credentials remain in this page's memory only; they are not persisted.</div>
+        <button onClick={()=>{setSnapshot(null);setToken('')}} className="text-[10px] font-mono text-accent">Edit credentials / reset live snapshot</button>
       </div>}
     </section>
   )
