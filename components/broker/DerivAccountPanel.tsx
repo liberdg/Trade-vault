@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { RefreshCw, Wallet, Activity, History, AlertTriangle } from 'lucide-react'
+import { DerivMarketTicket } from './DerivMarketTicket'
 
 type DerivSnapshot = {
   balance?: number
@@ -98,6 +99,7 @@ export function DerivAccountPanel({ appId, token, accountId, environment }: Prop
             {snapshot.transactions.length === 0 ? <p className="mt-1 text-[10px] text-muted">No statement transactions returned.</p> : <div className="mt-1 space-y-1">{snapshot.transactions.slice(0, 8).map((tx, index) => <div key={display(tx.transaction_id ?? tx.id, String(index))} className="rounded border border-border px-2 py-2 text-[10px]"><div className="flex justify-between gap-2 text-white"><span>{display(tx.action_type ?? tx.transaction_type ?? tx.type, 'Transaction')}</span><span className="font-mono">{display(tx.transaction_id ?? tx.id)}</span></div><div className="mt-1 text-muted">{display(tx.symbol ?? tx.description)} · {display(tx.amount ?? tx.balance)} {snapshot.currency || ''}</div></div>)}</div>}
           </div>
           <div className="text-[9px] text-muted">Data received {new Date(snapshot.retrievedAt).toLocaleTimeString()}</div>
+          <DerivMarketTicket currency={snapshot.currency || ''} />
         </div>
       )}
     </section>
