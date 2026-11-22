@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { calculateBrokerRisk } from '@/lib/broker/risk-engine'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+type OandaInstrument = {
+  name: string
+  displayPrecision: number
+  tradeUnitsPrecision: number
+  minimumTradeSize: string
+  maximumOrderUnits: string
+  pipLocation: number
+}
+
+function numeric(value: unknown): number | null {
+  const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
+  return Number.isFinite(number) ? number : null
+}
+
+async function oandaFetch(baseUrl: string, token: string, path: string) {
+  return fetch(`${baseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Accept-Datetime-Format': 'RFC3339' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(12000),
+  })
+}
 
 export async function POST(request: NextRequest) {
   const token = process.env.OANDA_API_TOKEN
@@ -10,59 +34,107 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'OANDA credentials are not configured on the server.' }, { status: 503 })
   }
 
-  const body = await request.json()
+  let body: Record<string, unknown>
+  try {
+    const raw = await request.json()
+    body = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
+  }
+
   const instrument = typeof body.instrument === 'string' ? body.instrument.trim().toUpperCase() : ''
-  const units = Number(body.units)
-  const stopLoss = body.stopLossDistance === undefined ? undefined : Number(body.stopLossDistance)
-  const takeProfit = body.takeProfitDistance === undefined ? undefined : Number(body.takeProfitDistance)
+  const unitsInput = numeric(body.units)
+  const stopLossDistance = numeric(body.stopLossDistance)
+  const takeProfitDistance = body.takeProfitDistance === undefined ? undefined : numeric(body.takeProfitDistance)
+  const maxRiskPercent = numeric(body.maxRiskPercent)
+  if (!/^[A-Z]{3}_[A-Z]{3}$/.test(instrument)) return NextResponse.json({ error: 'Instrument must use OANDA format, for example EUR_USD.' }, { status: 400 })
+  if (unitsInput === null || unitsInput === 0) return NextResponse.json({ error: 'Units must be a non-zero number.' }, { status: 400 })
+  if (stopLossDistance === null || stopLossDistance <= 0) return NextResponse.json({ error: 'A positive Stop Loss distance is mandatory for risk validation.' }, { status: 400 })
+  if (body.takeProfitDistance !== undefined && (takeProfitDistance === null || takeProfitDistance <= 0)) return NextResponse.json({ error: 'Take Profit distance must be positive.' }, { status: 400 })
+  if (maxRiskPercent === null || maxRiskPercent <= 0 || maxRiskPercent > 5) return NextResponse.json({ error: 'Maximum risk percentage must be between 0 and 5%.' }, { status: 400 })
+  if (environment === 'live' && (body.confirmLive !== true || process.env.OANDA_ALLOW_LIVE !== 'true')) return NextResponse.json({ error: 'Live order blocked. Server live execution opt-in and explicit confirmation are both required.' }, { status: 403 })
 
-  if (!/^[A-Z]{3}_[A-Z]{3}$/.test(instrument)) {
-    return NextResponse.json({ error: 'Instrument must use OANDA format, for example EUR_USD.' }, { status: 400 })
-  }
-  if (!Number.isFinite(units) || units === 0) {
-    return NextResponse.json({ error: 'Units must be a non-zero number.' }, { status: 400 })
-  }
-  if (stopLoss !== undefined && (!Number.isFinite(stopLoss) || stopLoss <= 0)) {
-    return NextResponse.json({ error: 'Stop loss distance must be positive.' }, { status: 400 })
-  }
-  if (takeProfit !== undefined && (!Number.isFinite(takeProfit) || takeProfit <= 0)) {
-    return NextResponse.json({ error: 'Take profit distance must be positive.' }, { status: 400 })
-  }
-  if (environment === 'live' && (body.confirmLive !== true || process.env.OANDA_ALLOW_LIVE !== 'true')) {
-    return NextResponse.json({ error: 'Live order blocked. Set server live execution opt-in and confirmLive=true.' }, { status: 403 })
-  }
+  const baseUrl = environment === 'live' ? 'https://api-fxtrade.oanda.com' : 'https://api-fxpractice.oanda.com'
+  try {
+    const [summaryResponse, instrumentsResponse, pricingResponse] = await Promise.all([
+      oandaFetch(baseUrl, token, `/v3/accounts/${encodeURIComponent(accountId)}/summary`),
+      oandaFetch(baseUrl, token, `/v3/accounts/${encodeURIComponent(accountId)}/instruments?instruments=${encodeURIComponent(instrument)}`),
+      oandaFetch(baseUrl, token, `/v3/accounts/${encodeURIComponent(accountId)}/pricing?instruments=${encodeURIComponent(instrument)}`),
+    ])
+    const [summary, instrumentData, pricingData] = await Promise.all([
+      summaryResponse.json(), instrumentsResponse.json(), pricingResponse.json(),
+    ])
+    if (!summaryResponse.ok) return NextResponse.json({ error: summary.errorMessage || 'Could not retrieve OANDA account summary for risk validation.' }, { status: summaryResponse.status })
+    if (!instrumentsResponse.ok) return NextResponse.json({ error: instrumentData.errorMessage || 'Could not retrieve instrument specifications from OANDA.' }, { status: instrumentsResponse.status })
+    if (!pricingResponse.ok) return NextResponse.json({ error: pricingData.errorMessage || 'Could not retrieve current OANDA pricing.' }, { status: pricingResponse.status })
 
-  const order: Record<string, unknown> = {
-    type: 'MARKET',
-    instrument,
-    units: String(units),
+    const account = summary.account as Record<string, unknown> | undefined
+    const accountCurrency = typeof account?.currency === 'string' ? account.currency : ''
+    const balance = numeric(account?.balance)
+    const equity = numeric(account?.NAV)
+    const specsRaw = (instrumentData.instruments as OandaInstrument[] | undefined)?.[0]
+    const quoteCurrency = instrument.split('_')[1]
+    const prices = (pricingData.prices as Array<Record<string, unknown>> | undefined)?.[0]
+    const bid = numeric((prices?.bids as Array<Record<string, unknown>> | undefined)?.[0]?.price)
+    const ask = numeric((prices?.asks as Array<Record<string, unknown>> | undefined)?.[0]?.price)
+    if (!accountCurrency || balance === null || equity === null || !specsRaw || bid === null || ask === null) {
+      return NextResponse.json({ error: 'Live account, instrument, or price metadata is incomplete. Risk validation was blocked.' }, { status: 502 })
+    }
+    if (quoteCurrency !== accountCurrency) {
+      return NextResponse.json({ error: `Risk conversion from ${quoteCurrency} to ${accountCurrency} is not verified yet. Order blocked to avoid inaccurate risk.` }, { status: 422 })
+    }
+    const precision = specsRaw.displayPrecision
+    const unitPrecision = specsRaw.tradeUnitsPrecision
+    const minimum = numeric(specsRaw.minimumTradeSize)
+    const maximum = numeric(specsRaw.maximumOrderUnits)
+    if (!Number.isInteger(precision) || precision < 0 || !Number.isInteger(unitPrecision) || unitPrecision < 0 || minimum === null || maximum === null || minimum <= 0 || maximum <= 0) {
+      return NextResponse.json({ error: 'OANDA instrument volume/precision metadata is incomplete. Risk validation was blocked.' }, { status: 502 })
+    }
+
+    const tickSize = 10 ** -precision
+    const unitStep = 10 ** -unitPrecision
+    const signedUnits = unitsInput
+    const direction = signedUnits > 0 ? 'BUY' : 'SELL'
+    const entryPrice = direction === 'BUY' ? ask : bid
+    const stopLoss = direction === 'BUY' ? entryPrice - stopLossDistance : entryPrice + stopLossDistance
+    const takeProfit = takeProfitDistance === undefined ? undefined : direction === 'BUY' ? entryPrice + takeProfitDistance : entryPrice - takeProfitDistance
+    const units = Math.abs(signedUnits)
+
+    const risk = calculateBrokerRisk({
+      balance, equity, riskBasis: 'equity', sizingMode: 'fixed_lots', fixedLots: units,
+      entryPrice, stopLoss, takeProfit, direction,
+      specs: {
+        tickSize, tickValuePerLot: tickSize, contractSize: 1,
+        volumeMin: minimum, volumeMax: maximum, volumeStep: unitStep,
+        quoteToAccountRate: 1,
+      },
+    })
+    if (!risk.valid || risk.estimatedLoss === null) {
+      return NextResponse.json({ error: 'Pre-trade risk validation rejected this order.', risk, accountCurrency }, { status: 422 })
+    }
+    const maximumRiskAmount = equity * maxRiskPercent / 100
+    if (risk.estimatedLoss > maximumRiskAmount) {
+      return NextResponse.json({
+        error: `Order blocked: estimated loss (${risk.estimatedLoss.toFixed(2)} ${accountCurrency}) exceeds your ${maxRiskPercent}% equity risk limit (${maximumRiskAmount.toFixed(2)} ${accountCurrency}).`,
+        risk: { ...risk, maximumRiskAmount, maxRiskPercent },
+        accountCurrency,
+      }, { status: 422 })
+    }
+
+    const order: Record<string, unknown> = { type: 'MARKET', instrument, units: String(signedUnits) }
+    order.stopLossOnFill = { timeInForce: 'GTC', distance: String(stopLossDistance) }
+    if (takeProfitDistance !== undefined) order.takeProfitOnFill = { timeInForce: 'GTC', distance: String(takeProfitDistance) }
+    const response = await fetch(`${baseUrl}/v3/accounts/${encodeURIComponent(accountId)}/orders`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept-Datetime-Format': 'RFC3339' },
+      body: JSON.stringify({ order }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    })
+    const result = await response.json()
+    if (!response.ok) return NextResponse.json({ error: result.errorMessage || 'OANDA rejected the order.', detail: result, risk, accountCurrency }, { status: response.status })
+    return NextResponse.json({ environment, accountId, accountCurrency, risk, result, orderStatus: 'submitted' })
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Order submission or risk validation failed.' }, { status: 502 })
   }
-  if (stopLoss !== undefined) order.stopLossOnFill = { timeInForce: 'GTC', distance: String(stopLoss) }
-  if (takeProfit !== undefined) order.takeProfitOnFill = { timeInForce: 'GTC', distance: String(takeProfit) }
-
-  const baseUrl = environment === 'live'
-    ? 'https://api-fxtrade.oanda.com'
-    : 'https://api-fxpractice.oanda.com'
-
-  const response = await fetch(`${baseUrl}/v3/accounts/${encodeURIComponent(accountId)}/orders`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Accept-Datetime-Format': 'RFC3339',
-    },
-    body: JSON.stringify({ order }),
-  })
-  const json = await response.json()
-  if (!response.ok) {
-    return NextResponse.json({
-      error: json.errorMessage || 'OANDA rejected the order.',
-      detail: json,
-    }, { status: response.status })
-  }
-
-  return NextResponse.json({
-    environment,
-    result: json,
-  })
 }
