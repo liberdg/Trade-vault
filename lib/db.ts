@@ -25,7 +25,7 @@ export const db = new TradingJournalDB()
 export const defaultSettings: UserSettings = {
   displayName: 'Trader',
   currency: 'USD',
-  accountBalance: 10000,
+  accountBalance: 0,
   riskPerTrade: 1,
   theme: 'void',
   defaultAsset: 'Forex',
