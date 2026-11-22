@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchBinanceCandles, fetchYahooCandles } from '@/lib/market'
 import { analyzeCandles } from '@/lib/smrt-analysis'
+import { analyzeMarketIntelligence } from '@/lib/market-intelligence/engine'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
       provider,
       retrievedAt: new Date().toISOString(),
       analysis: analyzeCandles(candles),
+      intelligence: analyzeMarketIntelligence(candles),
     })
   } catch (error) {
     return NextResponse.json({
