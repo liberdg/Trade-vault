@@ -1,11 +1,12 @@
 'use client'
 import {useEffect,useState} from 'react'
-import {Bell,RefreshCw,AlertTriangle} from 'lucide-react'
+import {Bell,RefreshCw} from 'lucide-react'
 type Intelligence=any
 export function MarketIntelligencePanel({symbol,kind,interval}:{symbol:string;kind:string;interval:string}){
+ const intelligenceTimeframe=['1m','5m','15m','30m','1h','2h','4h','1d','1w'].includes(interval)?interval:'1d'
  const [data,setData]=useState<Intelligence|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[alerts,setAlerts]=useState(false)
- async function load(){setLoading(true);setError('');try{const response=await fetch(`/api/market/intelligence?symbol=${encodeURIComponent(symbol)}&kind=${kind}&timeframes=${encodeURIComponent(interval)}`,{cache:'no-store'});const json=await response.json();if(!response.ok)throw new Error(json.error||'Intelligence request failed');setData(json.timeframes?.[0]?.analysis??null)}catch(e){setError(e instanceof Error?e.message:'Analysis unavailable')}finally{setLoading(false)}}
- useEffect(()=>{load()},[symbol,kind,interval])
+ async function load(){setLoading(true);setError('');try{const response=await fetch(`/api/market/intelligence?symbol=${encodeURIComponent(symbol)}&kind=${kind}&timeframes=${encodeURIComponent(intelligenceTimeframe)}`,{cache:'no-store'});const json=await response.json();if(!response.ok)throw new Error(json.error||'Intelligence request failed');setData(json.timeframes?.[0]?.analysis??null)}catch(e){setError(e instanceof Error?e.message:'Analysis unavailable')}finally{setLoading(false)}}
+ useEffect(()=>{load()},[symbol,kind,intelligenceTimeframe])
  useEffect(()=>{if(!alerts)return;const poll=async()=>{try{const r=await fetch(`/api/market/intelligence?symbol=${encodeURIComponent(symbol)}&kind=${kind}&timeframes=1h`,{cache:'no-store'});const j=await r.json();const setups=j.timeframes?.[0]?.analysis?.setups??[];const high=setups.filter((s:any)=>s.confidence==='HIGH');if(high.length&&'Notification'in window&&Notification.permission==='granted'){const key=`tv-alert-${symbol}-${high.map((s:any)=>s.direction).join('-')}`;if(sessionStorage.getItem(key)!=='1'){new Notification(`Trade-Vault · ${symbol}`,{body:`Setup ${high.map((s:any)=>s.direction).join(', ')} detected (watch only)`});sessionStorage.setItem(key,'1')}}}catch{} };poll();const id=window.setInterval(poll,60000);return()=>clearInterval(id)},[alerts,symbol,kind])
  async function toggleAlerts(){if(!alerts&&'Notification'in window&&Notification.permission==='default'){const permission=await Notification.requestPermission();if(permission!=='granted')return}setAlerts(v=>!v)}
  const core=data?.core
