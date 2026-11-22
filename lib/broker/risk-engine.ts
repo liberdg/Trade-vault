@@ -145,7 +145,7 @@ export function calculateBrokerRisk(input: BrokerRiskInputs): BrokerRiskResult {
         rewardRisk = estimatedLoss && estimatedLoss > 0 ? estimatedReward / estimatedLoss : null
       }
       if (specs.marginRate !== undefined && isPositiveFinite(input.entryPrice)) {
-        estimatedMargin = units !== null ? units * input.entryPrice * specs.marginRate : null
+        estimatedMargin = units !== null ? units * input.entryPrice * specs.marginRate * specs.quoteToAccountRate : null
       } else {
         warnings.push('Margin estimate unavailable: broker margin rate was not provided.')
       }
