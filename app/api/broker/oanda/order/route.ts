@@ -99,6 +99,10 @@ export async function POST(request: NextRequest) {
     const stopLoss = direction === 'BUY' ? entryPrice - stopLossDistance : entryPrice + stopLossDistance
     const takeProfit = takeProfitDistance === undefined ? undefined : direction === 'BUY' ? entryPrice + takeProfitDistance : entryPrice - takeProfitDistance
     const units = Math.abs(signedUnits)
+    const normalizedUnits = Number(units.toFixed(unitPrecision))
+    if (Math.abs(units - normalizedUnits) > 1e-9) {
+      return NextResponse.json({ error: `Order units exceed the broker's supported precision (${unitPrecision}).` }, { status: 400 })
+    }
 
     const risk = calculateBrokerRisk({
       balance, equity, riskBasis: 'equity', sizingMode: 'fixed_lots', fixedLots: units,
