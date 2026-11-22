@@ -15,7 +15,7 @@ export function runMarketIntelligence(symbol:string,timeframe:string,candles:Can
  const fvgs=detectFairValueGaps(candles)
  const supportResistance=detectSupportResistance(core.latestSwings,core.atr,core.currentPrice)
  const regime=classifyMarketRegime(candles,core.atr,core.structure)
- const setups=detectTradeSetups(core.latestSwings,liquidity.sweeps,orderBlocks,fvgs,core.structure)
+ const setups=detectTradeSetups(core.latestSwings,liquidity.sweeps,orderBlocks,fvgs,core.structure,core.currentPrice??0,core.atr??0,candles.length)
  const analyst=buildMarketAnalystSummary({symbol,timeframe,core,liquidity:liquidity.levels,sweeps:liquidity.sweeps,blocks:orderBlocks,gaps:fvgs,zones:supportResistance,setups})
  return {status:'READY',symbol,timeframe,core,liquidity,orderBlocks,fvgs,supportResistance,regime,setups,analyst}
 }
