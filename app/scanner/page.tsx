@@ -1,72 +1,11 @@
+'use client'
 import Link from 'next/link'
-import { fetchBinanceCandles } from '@/lib/market'
-import { analyzeCandles } from '@/lib/smrt-analysis'
-
-export const dynamic = 'force-dynamic'
-
-const ASSETS = [
-  { symbol: 'BTCUSDT', label: 'BTC / USDT' },
-  { symbol: 'ETHUSDT', label: 'ETH / USDT' },
-  { symbol: 'SOLUSDT', label: 'SOL / USDT' },
-  { symbol: 'BNBUSDT', label: 'BNB / USDT' },
-]
-
-export default async function ScannerPage() {
-  const results = await Promise.all(ASSETS.map(async asset => {
-    try {
-      const candles = await fetchBinanceCandles(asset.symbol, '1h', 180)
-      const analysis = analyzeCandles(candles)
-      return {
-        ...asset,
-        available: true,
-        provider: 'Binance',
-        score: analysis.score,
-        bias: analysis.bias,
-        structure: analysis.structure,
-        direction: analysis.direction,
-        confluences: analysis.confluences,
-        missing: analysis.missing,
-        timestamp: candles.at(-1)?.time ?? null,
-      }
-    } catch (error) {
-      return {
-        ...asset,
-        available: false,
-        provider: 'Binance',
-        score: 0,
-        bias: 'RANGE',
-        structure: 'RANGE',
-        direction: null,
-        confluences: [],
-        missing: [error instanceof Error ? error.message : 'Provider unavailable'],
-        timestamp: null,
-      }
-    }
-  }))
-
-  return (
-    <div className="mx-auto max-w-[1500px] space-y-4">
-      <div>
-        <div className="workstation-label">Market intelligence</div>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">Market scanner</h1>
-        <p className="mt-1 text-xs text-muted">Deterministic H1 analysis from Binance OHLC</p>
-      </div>
-      <div className="workstation-panel overflow-hidden">
-        {results.map(result => (
-          <Link key={result.symbol} href={`/market?symbol=${result.symbol}&interval=1h`}
-            className="grid gap-3 border-b border-border px-5 py-4 last:border-0 hover:bg-white/[0.02] md:grid-cols-[1fr_120px_120px_100px_1fr]">
-            <div>
-              <div className="font-mono text-sm font-bold text-white">{result.label}</div>
-              <div className="mt-1 text-xs text-muted">{result.provider} · real OHLC</div>
-            </div>
-            <div><div className="text-[10px] font-mono uppercase text-muted">Bias</div><div className={`mt-1 font-mono text-sm ${result.bias === 'BULLISH' ? 'text-bull' : result.bias === 'BEARISH' ? 'text-bear' : 'text-gold'}`}>{result.bias}</div></div>
-            <div><div className="text-[10px] font-mono uppercase text-muted">Structure</div><div className="mt-1 font-mono text-sm text-white">{result.structure}</div></div>
-            <div><div className="text-[10px] font-mono uppercase text-muted">Score</div><div className="mt-1 font-mono text-sm text-accent">{result.available ? `${result.score}/100` : 'N/A'}</div></div>
-            <div className="text-xs text-muted">{result.available ? result.confluences.slice(0, 3).join(' · ') : result.missing.join(' · ')}</div>
-          </Link>
-        ))}
-      </div>
-      <p className="text-xs leading-relaxed text-muted">Ce scanner ne crée aucune exécution ni alerte artificielle. Une ligne indisponible signifie que le fournisseur n’a retourné aucune donnée utilisable.</p>
-    </div>
-  )
+import {useEffect,useState} from 'react'
+import {MARKET_INSTRUMENTS} from '@/lib/market-instruments'
+const WATCH=['BTCUSDT','ETHUSDT','SOLUSDT','EURUSD','GBPUSD','USDJPY','XAUUSD','XAGUSD','^GSPC']
+type Row={symbol:string;label:string;kind:string;available:boolean;structure?:string;regime?:string;score?:number;setup?:string;price?:number;error?:string}
+export default function ScannerPage(){
+ const [rows,setRows]=useState<Row[]>([]),[loading,setLoading]=useState(true)
+ useEffect(()=>{let cancelled=false;Promise.all(WATCH.map(async symbol=>{const instrument=MARKET_INSTRUMENTS.find(i=>i.symbol===symbol);if(!instrument)return {symbol,label:symbol,kind:'crypto',available:false,error:'Not configured'};try{const r=await fetch(`/api/market/intelligence?symbol=${encodeURIComponent(symbol)}&kind=${instrument.kind}&timeframes=1h`,{cache:'no-store'});const j=await r.json();const a=j.timeframes?.[0]?.analysis;if(!r.ok||!a||a.status!=='READY')throw new Error(j.error||a?.status||'No data');return {symbol,label:instrument.label,kind:instrument.kind,available:true,structure:a.core.structure,regime:a.regime?.regime,score:a.setups?.[0]?.score??0,setup:a.setups?.[0]?.direction??'—',price:a.core.currentPrice}})).then(r=>{if(!cancelled){setRows(r);setLoading(false)}});return()=>{cancelled=true}},[])
+ return <div className="mx-auto max-w-[1500px] space-y-4"><div><div className="workstation-label">Market Intelligence · Multi-asset</div><h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">Market scanner</h1><p className="mt-1 text-xs text-muted">SMC / H1 · data provider + structure + volatility + setup candidate</p></div><div className="workstation-panel overflow-x-auto"><div className="grid min-w-[760px] grid-cols-[1.3fr_1fr_1fr_1fr_100px] gap-3 border-b border-border px-4 py-3 workstation-label"><span>Asset</span><span>Structure</span><span>Regime</span><span>Setup</span><span>Score</span></div>{loading?<div className="p-5 text-xs text-muted">Analyse multi-actifs en cours…</div>:rows.map(row=><Link key={row.symbol} href={`/market?symbol=${encodeURIComponent(row.symbol)}&interval=1h`} className="grid min-w-[760px] grid-cols-[1.3fr_1fr_1fr_1fr_100px] gap-3 border-b border-border px-4 py-3 text-xs hover:bg-white/[0.025]"><div><div className="font-mono font-semibold text-white">{row.label}</div><div className="text-[9px] text-muted">{row.symbol} · {row.kind}</div></div><span className={row.structure==='BULLISH'?'text-bull':row.structure==='BEARISH'?'text-bear':'text-muted'}>{row.structure??'UNAVAILABLE'}</span><span className="text-muted">{row.regime??row.error??'—'}</span><span className="font-mono text-accent">{row.setup??'—'}</span><span className="font-mono text-white">{row.score!==undefined?`${row.score} pts`:'—'}</span></Link>)}</div><p className="text-xs leading-relaxed text-muted">Les résultats sont des candidats d'analyse, pas des ordres. Les actifs indisponibles sont exclus de l'interprétation et affichés comme tels.</p></div>
 }
