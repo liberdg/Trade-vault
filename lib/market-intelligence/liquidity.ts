@@ -12,6 +12,6 @@ export function detectLiquidity(candles:Candle[],swings:Swing[],tolerancePct=0.0
   }
  }
  const sweeps:LiquiditySweep[]=[]
- candles.forEach((c,i)=>{if(i===0)return;for(const l of levels){if((l.type==='EQH'||l.type==='SWING_HIGH')&&c.high>l.price&&c.close<l.price)sweeps.push({direction:'BEARISH',level:l.price,candleIndex:i,reclaimed:true});else if((l.type==='EQL'||l.type==='SWING_LOW')&&c.low<l.price&&c.close>l.price)sweeps.push({direction:'BULLISH',level:l.price,candleIndex:i,reclaimed:true})}})
+ candles.forEach((c,i)=>{if(i===0)return;for(const l of levels){if(l.lastIndex>=i)continue;if((l.type==='EQH'||l.type==='SWING_HIGH')&&c.high>l.price&&c.close<l.price)sweeps.push({direction:'BEARISH',level:l.price,candleIndex:i,reclaimed:true});else if((l.type==='EQL'||l.type==='SWING_LOW')&&c.low<l.price&&c.close>l.price)sweeps.push({direction:'BULLISH',level:l.price,candleIndex:i,reclaimed:true})}})
  return {levels:levels.sort((a,b)=>b.touches-a.touches),sweeps:sweeps.slice(-20)}
 }
