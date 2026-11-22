@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { RefreshCw, ShieldCheck } from 'lucide-react'
 import { RealMarketChart } from '@/components/market/RealMarketChart'
+import { MarketIntelligencePanel } from '@/components/market/MarketIntelligencePanel'
 import {
   fetchBinanceCandles,
   fetchFrankfurterCandles,
@@ -236,6 +237,7 @@ export default async function MarketPage({ searchParams }: Props) {
               </div>
             </div>
           )}
+          <MarketIntelligencePanel symbol={selected.symbol} kind={selected.kind} interval={interval} />
         </div>
       </div>
     </div>
