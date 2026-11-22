@@ -34,6 +34,6 @@ export async function GET(request:NextRequest){
  const successful=results.filter(r=>'analysis' in r)
  const structures=successful.map(r=>r.analysis.core?.structure).filter(Boolean)
  const bullish=structures.includes('BULLISH'),bearish=structures.includes('BEARISH')
- const alignment=structures.length&&structures.every(s=>s===structures[0]&&s!=='RANGE'&&s!=='UNCONFIRMED')?structures[0]:bullish&&bearish?'CONFLICTING':'MIXED_OR_UNCONFIRMED'
+ const alignment=structures.length>0&&structures.every(s=>s===structures[0]&&s!=='RANGE'&&s!=='UNCONFIRMED')?String(structures[0]):bullish&&bearish?'CONFLICTING':'MIXED_OR_UNCONFIRMED'
  return NextResponse.json({symbol,kind:kindValue,timeframes:results,alignment,analyzedAt:new Date().toISOString(),availableTimeframes:successful.length,requestedTimeframes:unique.length})
 }
