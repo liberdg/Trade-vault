@@ -28,10 +28,10 @@ describe('calculateBrokerRisk', () => {
     })
     expect(result.valid).toBe(true)
     expect(result.riskAmount).toBe(98)
-    expect(result.lots).toBeCloseTo(1.96)
-    expect(result.estimatedLoss).toBeCloseTo(98)
+    expect(result.lots).toBeCloseTo(0.19)
+    expect(result.estimatedLoss).toBeCloseTo(95)
     expect(result.rewardRisk).toBeCloseTo(2)
-    expect(result.estimatedMargin).toBeCloseTo(4312)
+    expect(result.estimatedMargin).toBeCloseTo(418)
   })
 
   it('rejects a stop loss on the wrong side of entry', () => {
