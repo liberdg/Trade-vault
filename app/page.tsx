@@ -6,6 +6,7 @@ import { ArrowRight, ChartNoAxesCombined, CircleAlert, ShieldCheck, RefreshCw, W
 import { useTradingStore } from '@/store/tradingStore'
 import { computeAnalytics } from '@/lib/analytics'
 import { MarketWatchlist } from '@/components/dashboard/MarketWatchlist'
+import { EquityCurve } from '@/components/dashboard/EquityCurve'
 import { RecentTrades } from '@/components/dashboard/RecentTrades'
 import { db, getSettings } from '@/lib/db'
 import type { BrokerConnection, UserSettings } from '@/types'
@@ -59,8 +60,8 @@ export default function DashboardPage() {
         <div className="workstation-panel min-w-0 p-4">
           <div className="flex h-8 items-start justify-between">
             <div>
-              <div className="text-xs font-semibold text-white">Equity curve</div>
-              <div className="mt-1 font-mono text-[9px] text-muted">FROM JOURNAL RECORDS</div>
+              <div className="text-xs font-semibold text-white">Journal performance curve</div>
+              <div className="mt-1 font-mono text-[9px] text-muted">MANUAL JOURNAL · NOT BROKER EQUITY</div>
             </div>
           </div>
           <EquityCurve />
