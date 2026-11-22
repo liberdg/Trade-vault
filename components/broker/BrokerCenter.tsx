@@ -78,6 +78,28 @@ export function BrokerCenter() {
         const discovered = result.accounts.filter((account: unknown) => account && typeof account === 'object' && 'accountId' in account && 'environment' in account) as typeof derivAccounts
         setDerivAccounts(discovered)
         if (!selectedDerivAccountId && result.accountId) setSelectedDerivAccountId(String(result.accountId))
+        // Persist discovered account identities as unverified/disconnected. Only the
+        // account whose OTP WebSocket was successfully checked below becomes connected.
+        const knownConnections = await db.brokerConnections.toArray()
+        for (const discoveredAccount of discovered) {
+          const known = knownConnections.find(connection => connection.brokerId === 'deriv' && connection.accountId === discoveredAccount.accountId && connection.environment === discoveredAccount.environment)
+          if (!known) {
+            await db.brokerConnections.put({
+              id: uuidv4(),
+              brokerId: 'deriv',
+              brokerName: 'Deriv',
+              connectionType: 'official_api',
+              accountId: discoveredAccount.accountId,
+              nickname: `Deriv ${discoveredAccount.accountId}`,
+              environment: discoveredAccount.environment,
+              permissionMode: 'read_only',
+              status: 'disconnected',
+              platform: 'deriv_api',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            })
+          }
+        }
       }
       if (result.status === 'connected') {
         const existing = connections.find(connection =>
