@@ -6,7 +6,6 @@ import { ArrowRight, ChartNoAxesCombined, CircleAlert, ShieldCheck, RefreshCw, W
 import { useTradingStore } from '@/store/tradingStore'
 import { computeAnalytics } from '@/lib/analytics'
 import { MarketWatchlist } from '@/components/dashboard/MarketWatchlist'
-import { EquityCurve } from '@/components/dashboard/EquityCurve'
 import { RecentTrades } from '@/components/dashboard/RecentTrades'
 import { db, getSettings } from '@/lib/db'
 import type { BrokerConnection, UserSettings } from '@/types'
@@ -30,7 +29,6 @@ export default function DashboardPage() {
   }, [])
   const activeConnection = activeBrokerAccount ? brokerConnections.find(connection => connection.status === 'connected' && connection.brokerId === activeBrokerAccount.brokerId && connection.accountId === activeBrokerAccount.accountId && connection.environment === activeBrokerAccount.environment) : undefined
   const analytics = useMemo(() => computeAnalytics(trades), [trades])
-  const equity = settings.accountBalance + analytics.totalPnl
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-4">
@@ -45,11 +43,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <div className="rounded border border-[#f2bd66]/25 bg-[#f2bd66]/5 px-3 py-2 text-[10px] leading-relaxed text-[#f2bd66]">
+        PERSONAL JOURNAL DATA ONLY — these metrics are based on manually recorded trades. They are not broker balances, live equity, or verified executions.
+      </div>
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
-        <Metric label="Journal equity (local)" value={`${equity.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} detail={`${analytics.totalPnl >= 0 ? '+' : ''}${analytics.totalPnl.toFixed(2)} USD · journal only`} />
-        <Metric label="Closed trades" value={String(analytics.totalTrades)} detail={analytics.totalTrades === 0 ? 'No executed history' : `${analytics.winRate.toFixed(1)}% win rate`} />
-        <Metric label="Profit factor" value={analytics.profitFactor === 999 ? '∞' : analytics.profitFactor.toFixed(2)} detail="Gross profit / gross loss" />
-        <Metric label="Open exposure" value={String(trades.filter(trade => trade.status === 'OPEN').length)} detail="Journal positions only" />
+        <Metric label="Journal realized P/L" value={`${analytics.totalPnl >= 0 ? '+' : ''}${analytics.totalPnl.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} detail="Manual journal records only" />
+        <Metric label="Journal closed trades" value={String(analytics.totalTrades)} detail="Manually recorded closed entries" />
+        <Metric label="Journal win rate" value={analytics.totalTrades ? `${analytics.winRate.toFixed(1)}%` : 'N/A'} detail="Journal-only statistic" />
+        <Metric label="Journal open entries" value={String(trades.filter(trade => trade.status === 'OPEN').length)} detail="Not verified broker positions" />
       </div>
 
       {activeConnection?.brokerId === 'deriv' && activeConnection.accountId && <DerivDashboardLive accountId={activeConnection.accountId} environment={activeConnection.environment} nickname={activeConnection.nickname || activeConnection.brokerName} savedAppId={savedDerivCredentials.appId} savedToken={savedDerivCredentials.token} />}
