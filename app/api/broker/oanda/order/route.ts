@@ -116,6 +116,9 @@ export async function POST(request: NextRequest) {
     if (!risk.valid || risk.estimatedLoss === null) {
       return NextResponse.json({ error: 'Pre-trade risk validation rejected this order.', risk, accountCurrency }, { status: 422 })
     }
+    if (risk.lots === null || Math.abs(risk.lots - units) > 1e-9) {
+      return NextResponse.json({ error: 'Submitted volume does not match the broker-normalized volume. Order blocked.', risk, accountCurrency }, { status: 422 })
+    }
     const maximumRiskAmount = equity * maxRiskPercent / 100
     if (risk.estimatedLoss > maximumRiskAmount) {
       return NextResponse.json({
