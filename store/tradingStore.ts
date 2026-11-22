@@ -49,7 +49,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         : trade.entryPrice - trade.exitPrice
       trade.pnl = diff * trade.positionSize
       const settings = get().settings
-      trade.pnlPercent = (trade.pnl / settings.accountBalance) * 100
+      trade.pnlPercent = settings.accountBalance > 0 ? (trade.pnl / settings.accountBalance) * 100 : undefined
     }
     await db.trades.add(trade)
     set(s => ({ trades: [trade, ...s.trades] }))
