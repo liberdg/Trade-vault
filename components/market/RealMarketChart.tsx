@@ -34,16 +34,19 @@ export function RealMarketChart({ candles, provider, status, retrievedAt, analys
         if (!response.ok) return
         const data = await response.json()
         if (cancelled || !Array.isArray(data.candles)) return
-        const merged = new Map<number, Candle>()
-        for (const candle of liveCandles) merged.set(candle.time, candle)
-        for (const candle of data.candles) merged.set(candle.time, candle)
-        setLiveCandles(Array.from(merged.values()).sort((a, b) => a.time - b.time).slice(-200))
+        setLiveCandles(previous => {
+          const merged = new Map<number, Candle>()
+          for (const candle of previous) merged.set(candle.time, candle)
+          for (const candle of data.candles as Candle[]) merged.set(candle.time, candle)
+          return Array.from(merged.values()).sort((a, b) => a.time - b.time).slice(-200)
+        })
         setLiveStatus(data.status)
         setLiveRetrievedAt(data.retrievedAt)
       } catch {
         setLiveStatus('delayed')
       }
     }
+    void refresh()
     const timer = window.setInterval(refresh, 30000)
     return () => {
       cancelled = true

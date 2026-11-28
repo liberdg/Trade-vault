@@ -56,36 +56,44 @@ export async function GET(request: NextRequest) {
           spread: deriv.spread,
         })
       } catch (derivError) {
-        if (interval === '2h' || interval === '1mo') {
+        if (interval === '2h' || interval === '4h' || interval === '1mo') {
           return NextResponse.json({
             error: `No verified provider returned ${interval} candles`,
             detail: derivError instanceof Error ? derivError.message : 'Deriv unavailable',
             retrievedAt: new Date().toISOString(),
           }, { status: 502 })
         }
-      try {
-        const candles = await fetchYahooCandles(symbol, interval, kind)
-        return NextResponse.json({
-          symbol,
-          provider: 'yahoo',
-          status: 'delayed',
-          retrievedAt: new Date().toISOString(),
-          interval,
-          candles,
-        })
-      } catch (yahooError) {
-        const [, base, quote] = match
-        const candles = await fetchFrankfurterCandles(base, quote)
-        return NextResponse.json({
-          symbol,
-          provider: 'frankfurter',
-          status: 'eod',
-          retrievedAt: new Date().toISOString(),
-          interval: '1d',
-          candles,
-          warning: yahooError instanceof Error ? yahooError.message : 'Yahoo Finance unavailable',
-        })
-      }
+        try {
+          const candles = await fetchYahooCandles(symbol, interval, kind)
+          return NextResponse.json({
+            symbol,
+            provider: 'yahoo',
+            status: 'delayed',
+            retrievedAt: new Date().toISOString(),
+            interval,
+            candles,
+          })
+        } catch (yahooError) {
+          // Frankfurter is daily close-only — only use it for 1d requests.
+          if (interval !== '1d') {
+            return NextResponse.json({
+              error: 'No verified provider returned usable forex candles',
+              detail: yahooError instanceof Error ? yahooError.message : 'Yahoo Finance unavailable',
+              retrievedAt: new Date().toISOString(),
+            }, { status: 502 })
+          }
+          const [, base, quote] = match
+          const candles = await fetchFrankfurterCandles(base, quote)
+          return NextResponse.json({
+            symbol,
+            provider: 'frankfurter',
+            status: 'eod',
+            retrievedAt: new Date().toISOString(),
+            interval: '1d',
+            candles,
+            warning: yahooError instanceof Error ? yahooError.message : 'Yahoo Finance unavailable',
+          })
+        }
       }
     }
 

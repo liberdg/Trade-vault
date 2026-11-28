@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Send } from 'lucide-react'
+import { getExecutionSecretHeaders } from '@/lib/broker/client-execution-headers'
 
 interface Props {
   connected: boolean
@@ -34,7 +35,7 @@ export function BrokerOrderForm({ connected, environment, liveExecutionEnabled }
     try {
       const response = await fetch('/api/broker/oanda/order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getExecutionSecretHeaders() },
         body: JSON.stringify({
           instrument,
           units: Number(units),

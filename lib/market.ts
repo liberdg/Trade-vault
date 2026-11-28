@@ -40,7 +40,6 @@ const YAHOO_INTERVALS: Record<string, string> = {
   '15m': '15m',
   '30m': '30m',
   '1h': '1h',
-  '4h': '1h',
   '1d': '1d',
   '1w': '1wk',
 }
@@ -69,12 +68,17 @@ export async function fetchBinanceCandles(symbol: string, interval: string, limi
 }
 
 export async function fetchYahooCandles(symbol: string, interval: string, kind: MarketKind): Promise<Candle[]> {
+  // Yahoo does not provide a true 4h interval. Refuse rather than silently returning 1h bars labeled as 4h.
+  if (interval === '4h') {
+    throw new Error('Yahoo Finance does not provide verified 4h candles. Use a provider that supports H4 (for example Deriv) or select 1h.')
+  }
   const ticker = kind === 'forex'
     ? `${symbol.toUpperCase().replace(/[^A-Z]/g, '')}=X`
     : kind === 'crypto'
       ? `${symbol.toUpperCase().replace(/USDT$/, '')}-USD`
       : symbol.toUpperCase()
-  const yahooInterval = YAHOO_INTERVALS[interval] ?? '1h'
+  const yahooInterval = YAHOO_INTERVALS[interval]
+  if (!yahooInterval) throw new Error(`Yahoo Finance does not support interval ${interval}`)
   const range = interval === '1m' ? '7d' : interval === '1w' ? '10y' : '1y'
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=${yahooInterval}`
   const response = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'SMRT-Trading-Analytics/1.0' } })
@@ -160,7 +164,8 @@ export async function fetchDerivCandles(symbol: string, interval: string, kind: 
   if (granularity == null) throw new Error(`Deriv does not provide a direct ${interval} candle feed`)
 
   const derivSymbol = toDerivSymbol(symbol, kind)
-  const appId = process.env.DERIV_APP_ID || '1089'
+  const appId = process.env.DERIV_APP_ID?.trim()
+  if (!appId) throw new Error('DERIV_APP_ID is not configured. Public app id fallbacks are disabled to avoid masking misconfiguration.')
 
   return await new Promise((resolve, reject) => {
     let socket: WebSocket

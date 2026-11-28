@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateBrokerRisk } from '@/lib/broker/risk-engine'
+import { assertExecutionAuthorized } from '@/lib/broker/execution-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,6 +28,9 @@ async function oandaFetch(baseUrl: string, token: string, path: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = assertExecutionAuthorized(request)
+  if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status })
+
   const token = process.env.OANDA_API_TOKEN
   const accountId = process.env.OANDA_ACCOUNT_ID
   const environment = process.env.OANDA_ENVIRONMENT === 'live' ? 'live' : 'practice'

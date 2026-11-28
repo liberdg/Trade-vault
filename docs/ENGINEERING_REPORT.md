@@ -114,6 +114,18 @@ Generated during the operationalization audit and repair cycle.
 - Unit tests: broker registry, adapter contract, sync engine, risk engine, market intelligence (run via `npm test`).
 - Integration against live brokers: **BLOCKED** — no API tokens configured in this environment.
 
+## K. Follow-up audit remediation
+Addressed findings from broker/market audits:
+- MT4 bridge now uses `MT4_BRIDGE_*` (no longer aliases MT5 env).
+- OANDA order form + status panel mounted in Broker Center.
+- Yahoo no longer maps `4h→1h`; H4 fails closed without a true H4 provider.
+- Frankfurter EOD only used for `1d` forex fallback.
+- Pending brokers (Binance/Bybit/cTrader) cannot run Test & connect.
+- Optional `SMRT_EXECUTION_SECRET` gates order/status/close-all.
+- Chart live poll merges via functional state (no stale `liveCandles` closure).
+- `smrt-analysis` BOS requires swing close break, not structure label alone.
+- `DERIV_APP_ID` required for Deriv candle WS (no hardcoded `1089`).
+
 ### Feature status summary
 | Feature | Status |
 |---------|--------|

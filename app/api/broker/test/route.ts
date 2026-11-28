@@ -181,29 +181,47 @@ async function testDeriv(token: string, appId: string, environment: 'demo' | 're
   }
 }
 
-async function testMt5() {
-  const bridgeUrl = process.env.MT5_BRIDGE_URL
-  const pairingToken = process.env.MT5_BRIDGE_TOKEN
-  if (!bridgeUrl || !pairingToken) return { status: 'disconnected', message: 'MT5 bridge URL and pairing token are not configured on the server.' }
+async function testMtBridge(kind: 'mt5' | 'mt4') {
+  const bridgeUrl = (kind === 'mt4' ? process.env.MT4_BRIDGE_URL : process.env.MT5_BRIDGE_URL)?.trim()
+  const pairingToken = (kind === 'mt4' ? process.env.MT4_BRIDGE_TOKEN : process.env.MT5_BRIDGE_TOKEN)?.trim()
+  const label = kind.toUpperCase()
+  if (!bridgeUrl || !pairingToken) {
+    return { status: 'disconnected', message: `${label} bridge URL and pairing token are not configured on the server.` }
+  }
   try {
     const response = await fetch(`${bridgeUrl.replace(/\/$/, '')}/health`, {
       cache: 'no-store',
       headers: { Authorization: `Bearer ${pairingToken}` },
     })
-    if (!response.ok) return { status: 'connection_error', message: `MT5 bridge returned HTTP ${response.status}.` }
+    if (!response.ok) return { status: 'connection_error', message: `${label} bridge returned HTTP ${response.status}.` }
     const json = await response.json()
-    if (!json.connected || !json.accountId) return { status: 'disconnected', message: json.message || 'MT5 terminal is not connected to an account.' }
+    if (!json.connected || !json.accountId) return { status: 'disconnected', message: json.message || `${label} terminal is not connected to an account.` }
     return {
       status: 'connected',
       accountId: String(json.accountId),
       server: json.server,
       currency: json.currency,
       balance: typeof json.balance === 'number' ? json.balance : null,
-      message: 'MT5 bridge authenticated and returned a terminal account.',
+      message: `${label} bridge authenticated and returned a terminal account.`,
     }
   } catch (error) {
-    return { status: 'connection_error', message: error instanceof Error ? error.message : 'MT5 bridge is unreachable.' }
+    return { status: 'connection_error', message: error instanceof Error ? error.message : `${label} bridge is unreachable.` }
   }
+}
+
+async function testOandaWithEnvironment(requestedEnvironment: 'demo' | 'real') {
+  const result = await testOanda()
+  if (result.status !== 'connected') return result
+  const mapped = result.environment === 'live' ? 'real' : 'demo'
+  if (mapped !== requestedEnvironment) {
+    return {
+      status: 'account_environment_mismatch',
+      message: `OANDA server is configured for ${result.environment}, but ${requestedEnvironment} was selected in the UI.`,
+      accountId: result.accountId,
+      environment: mapped,
+    }
+  }
+  return { ...result, environment: mapped }
 }
 
 export async function POST(request: NextRequest) {
@@ -227,17 +245,26 @@ export async function POST(request: NextRequest) {
 
   let result
   try {
-    if (brokerId === 'oanda' && connectionType === 'official_api') result = await testOanda()
+    if (brokerId === 'oanda' && connectionType === 'official_api') result = await testOandaWithEnvironment(environment)
     else if (brokerId === 'deriv' && connectionType === 'official_api') {
-      if (!appId || !token) result = { status: 'invalid_request', message: 'Deriv App ID and Personal Access Token are required.' }
-      else {
-        result = await testDeriv(token, appId, environment, requestedAccountId)
-        if (result.status === 'connected' && result.environment !== environment) result = { status: 'account_environment_mismatch', message: `The token authenticated a ${result.environment} account, but ${environment} was selected.`, accountId: result.accountId }
+      const resolvedAppId = appId || process.env.DERIV_APP_ID?.trim() || ''
+      const resolvedToken = token || process.env.DERIV_API_TOKEN?.trim() || ''
+      if (!resolvedAppId || !resolvedToken) {
+        result = { status: 'invalid_request', message: 'Deriv App ID and Personal Access Token are required (request body or server DERIV_APP_ID / DERIV_API_TOKEN).' }
+      } else {
+        result = await testDeriv(resolvedToken, resolvedAppId, environment, requestedAccountId)
+        if (result.status === 'connected' && result.environment !== environment) {
+          result = { status: 'account_environment_mismatch', message: `The token authenticated a ${result.environment} account, but ${environment} was selected.`, accountId: result.accountId }
+        }
       }
     }
-    else if (['mt5', 'mt4', 'exness'].includes(brokerId as string) && ['mt5_bridge', 'mt4_bridge'].includes(connectionType as string)) result = await testMt5()
+    else if (brokerId === 'mt5' && connectionType === 'mt5_bridge') result = await testMtBridge('mt5')
+    else if (brokerId === 'mt4' && connectionType === 'mt4_bridge') result = await testMtBridge('mt4')
+    else if (brokerId === 'exness' && connectionType === 'mt5_bridge') result = await testMtBridge('mt5')
     else if (brokerId === 'exness' && connectionType === 'official_api') {
       result = { status: 'permission_error', message: 'Exness official API eligibility and credentials must be provided through a verified Exness API integration. Standard MT accounts are not assumed eligible.' }
+    } else if (connectionType === 'exchange_api' || connectionType === 'ctrader_api' || connectionType === 'oauth') {
+      result = { status: 'disconnected', message: 'This broker has no verified adapter yet. Test & connect is disabled until an authenticated demo integration passes.' }
     } else {
       result = { status: 'disconnected', message: 'This broker or connection method has no verified adapter configured.' }
     }

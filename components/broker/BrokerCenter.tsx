@@ -7,6 +7,8 @@ import { db, getSettings, updateSettings, upsertAccountSnapshot } from '@/lib/db
 import type { BrokerConnection, BrokerConnectionStatus, BrokerConnectionType } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { DerivAccountPanel } from './DerivAccountPanel'
+import { BrokerOrderForm } from './BrokerOrderForm'
+import { getExecutionSecretHeaders, readExecutionSecretSession, setExecutionSecretSession } from '@/lib/broker/client-execution-headers'
 
 const DERIV_SESSION_APP_ID_KEY = 'smrt-deriv-app-id-session'
 const DERIV_SESSION_TOKEN_KEY = 'smrt-deriv-token-session'
@@ -53,10 +55,60 @@ export function BrokerCenter() {
   const [activeAccount, setActiveAccount] = useState<{ brokerId: string; accountId: string; environment: 'demo' | 'real' } | null>(null)
   const [closeReport, setCloseReport] = useState('')
   const [syncReport, setSyncReport] = useState('')
+  const [oandaStatus, setOandaStatus] = useState<{
+    connected: boolean
+    configured: boolean
+    environment: 'practice' | 'live'
+    liveExecutionEnabled: boolean
+    message?: string
+    accountId?: string
+    balance?: number | null
+    currency?: string
+  } | null>(null)
+  const [executionSecret, setExecutionSecret] = useState('')
+
+  const refreshOandaStatus = async () => {
+    try {
+      const response = await fetch('/api/broker/oanda/status', {
+        cache: 'no-store',
+        headers: { ...getExecutionSecretHeaders() },
+      })
+      const json = await response.json()
+      if (!response.ok) {
+        setOandaStatus({
+          connected: false,
+          configured: false,
+          environment: 'practice',
+          liveExecutionEnabled: false,
+          message: json.error || json.message || 'OANDA status unavailable',
+        })
+        return
+      }
+      setOandaStatus({
+        connected: !!json.connected,
+        configured: !!json.configured,
+        environment: json.environment === 'live' ? 'live' : 'practice',
+        liveExecutionEnabled: !!json.liveExecutionEnabled,
+        message: json.message,
+        accountId: json.accountId,
+        balance: json.balance,
+        currency: json.currency,
+      })
+    } catch {
+      setOandaStatus({
+        connected: false,
+        configured: false,
+        environment: 'practice',
+        liveExecutionEnabled: false,
+        message: 'Could not reach OANDA status endpoint.',
+      })
+    }
+  }
 
   useEffect(() => {
     db.brokerConnections.toArray().then(setConnections)
     const session = readDerivSession()
+    setExecutionSecret(readExecutionSecretSession())
     getSettings().then(settings => {
       setDerivAppId(session.appId || settings.derivAppId || '')
       setDerivToken(session.token)
@@ -67,7 +119,10 @@ export function BrokerCenter() {
         if (entry) { setSelected(entry); setConnectionType(entry.connectionTypes[0]); setEnvironment(active.environment) }
       }
     })
+    void refreshOandaStatus()
   }, [])
+
+  const canTestConnect = selected.integrationStatus === 'real_adapter' || selected.integrationStatus === 'bridge_required'
 
   const filtered = catalog.filter(entry =>
     `${entry.name} ${entry.description}`.toLowerCase().includes(query.toLowerCase())
@@ -82,6 +137,10 @@ export function BrokerCenter() {
   }
 
   const testConnection = async () => {
+    if (!canTestConnect) {
+      setTestResult({ status: 'disconnected', message: 'This broker has no verified adapter yet. Connection testing is disabled until an authenticated integration is implemented.' })
+      return
+    }
     if (selected.id === 'deriv' && (!derivAppId.trim() || !derivToken.trim())) {
       setTestResult({ status: 'invalid_request', message: 'Enter your Deriv App ID and Personal Access Token to test this connection.' })
       return
@@ -357,7 +416,7 @@ export function BrokerCenter() {
     try {
       const response = await fetch('/api/broker/close-all', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getExecutionSecretHeaders() },
         body: JSON.stringify({
           confirm: true,
           brokerId: activeAccount.brokerId,
@@ -501,10 +560,13 @@ export function BrokerCenter() {
             ))}
           </div>
 
-          <button onClick={testConnection} disabled={testing} className="mt-4 flex h-9 items-center gap-2 rounded-md bg-accent px-4 text-xs font-bold text-[#090c10] disabled:opacity-50">
+          <button onClick={testConnection} disabled={testing || !canTestConnect} className="mt-4 flex h-9 items-center gap-2 rounded-md bg-accent px-4 text-xs font-bold text-[#090c10] disabled:opacity-50">
             {testing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
-            Test & connect
+            {canTestConnect ? 'Test & connect' : 'Adapter pending'}
           </button>
+          {!canTestConnect && (
+            <p className="mt-2 text-[10px] text-[#f2bd66]">Catalog placeholder only — no verified API adapter is registered for this broker.</p>
+          )}
 
           {testResult && (
             <div className={`mt-4 flex items-start gap-2 rounded-lg border px-4 py-3 text-xs ${testResult.status === 'connected' ? 'border-[#2ad39b]/20 bg-[#2ad39b]/10 text-[#2ad39b]' : 'border-[#f2bd66]/20 bg-[#f2bd66]/10 text-[#f2bd66]'}`}>
@@ -563,6 +625,53 @@ export function BrokerCenter() {
         <DerivAccountPanel appId={derivAppId} token={derivToken} accountId={activeAccount.accountId} environment={activeAccount.environment} />
       )}
 
+      {(activeAccount?.brokerId === 'oanda' || selected.id === 'oanda') && (
+        <section className="space-y-3">
+          <div className="workstation-panel p-4">
+            <div className="workstation-label">Execution secret (optional)</div>
+            <p className="mt-1 text-[10px] text-muted">Required only when server has SMRT_EXECUTION_SECRET set. Stored in sessionStorage for this browser session.</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="password"
+                value={executionSecret}
+                onChange={event => {
+                  setExecutionSecret(event.target.value)
+                  setExecutionSecretSession(event.target.value)
+                }}
+                placeholder="x-smrt-execution-secret"
+                className="market-input flex-1"
+                autoComplete="off"
+              />
+              <button type="button" onClick={() => void refreshOandaStatus()} className="rounded-md border border-accent/30 px-3 text-[10px] font-mono text-accent">Refresh status</button>
+            </div>
+          </div>
+          <div className="workstation-panel p-4">
+            <div className="workstation-label">OANDA account status</div>
+            {oandaStatus ? (
+              <div className="mt-2 space-y-1 text-xs text-muted">
+                <div className="font-mono text-white">
+                  {oandaStatus.connected ? 'CONNECTED' : oandaStatus.configured ? 'CONFIGURED · NOT CONNECTED' : 'NOT CONFIGURED'}
+                  {' · '}
+                  {oandaStatus.environment.toUpperCase()}
+                </div>
+                {oandaStatus.accountId && <div className="font-mono">Account {oandaStatus.accountId}</div>}
+                {oandaStatus.connected && oandaStatus.balance != null && (
+                  <div className="font-mono text-white">Balance {oandaStatus.balance} {oandaStatus.currency}</div>
+                )}
+                {oandaStatus.message && <div>{oandaStatus.message}</div>}
+                <div className="text-[10px]">Live execution: {oandaStatus.liveExecutionEnabled ? 'ENABLED' : 'DISABLED'}</div>
+              </div>
+            ) : (
+              <div className="mt-2 text-xs text-muted">Loading OANDA status…</div>
+            )}
+          </div>
+          <BrokerOrderForm
+            connected={!!oandaStatus?.connected}
+            environment={oandaStatus?.environment ?? 'practice'}
+            liveExecutionEnabled={!!oandaStatus?.liveExecutionEnabled}
+          />
+        </section>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="workstation-panel p-4">

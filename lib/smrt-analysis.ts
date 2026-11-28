@@ -162,10 +162,15 @@ export function analyzeCandles(candles: Candle[]): MarketAnalysis {
           ? 'BEARISH'
           : 'RANGE'
 
-  const bos = bullishStructure || bearishStructure
+  // BOS = close beyond the latest swing high/low. Do not equate HH/HL structure alone with BOS.
+  const bos = Boolean(
+    (previousHigh && last.close > previousHigh.price) ||
+    (previousLow && last.close < previousLow.price)
+  )
+  // CHoCH = swing sequence reverses against the current directional structure (conservative heuristic).
   const choch = Boolean(
-    (previousHigh && lastHigh && lastHigh.price < previousHigh.price) ||
-    (previousLow && lastLow && lastLow.price > previousLow.price)
+    (bullishStructure && previousHigh && lastHigh && lastHigh.price < previousHigh.price) ||
+    (bearishStructure && previousLow && lastLow && lastLow.price > previousLow.price)
   )
 
   const confluences: string[] = []

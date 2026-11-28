@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { assertExecutionAuthorized } from '@/lib/broker/execution-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -8,6 +9,9 @@ export const runtime = 'nodejs'
  * Currently: OANDA open trades via v20. Other brokers remain unsupported.
  */
 export async function POST(request: NextRequest) {
+  const auth = assertExecutionAuthorized(request)
+  if (!auth.ok) return NextResponse.json({ status: 'unauthorized', message: auth.message }, { status: auth.status })
+
   let body: Record<string, unknown> = {}
   try {
     const raw = await request.json()
