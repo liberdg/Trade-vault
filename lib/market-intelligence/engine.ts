@@ -20,7 +20,8 @@ export function validateCandles(input: Candle[]): { candles: Candle[]; issues: s
   const valid: Candle[] = []
   let rejectedCount = 0
   let lastTime = -Infinity
-  for (const [i, c] of input.entries()) {
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i]
     if (![c?.time, c?.open, c?.high, c?.low, c?.close].every(Number.isFinite) ||
       c.time <= 0 || c.open <= 0 || c.high <= 0 || c.low <= 0 || c.close <= 0 ||
       c.high < Math.max(c.open, c.close, c.low) || c.low > Math.min(c.open, c.close, c.high)) {

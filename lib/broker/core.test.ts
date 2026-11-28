@@ -12,7 +12,15 @@ describe('broker registry', () => {
     expect(BROKER_CATALOG.find(broker => broker.id === 'exness')?.connectionTypes).toContain('mt5_bridge')
   })
 
-  it('declares OANDA as the only currently implemented adapter in the existing module', () => {
-    expect(BROKER_CATALOG.find(broker => broker.id === 'oanda')?.integrationStatus).toBe('real_adapter')
+  it('declares OANDA as a real adapter with sync and place_order capabilities', () => {
+    const oanda = BROKER_CATALOG.find(broker => broker.id === 'oanda')
+    expect(oanda?.integrationStatus).toBe('real_adapter')
+    expect(oanda?.capabilities).toEqual(expect.arrayContaining(['balance', 'positions', 'pending_orders', 'place_order']))
+  })
+
+  it('marks Deriv as a real adapter without claiming unsupported MT control', () => {
+    const deriv = BROKER_CATALOG.find(broker => broker.id === 'deriv')
+    expect(deriv?.integrationStatus).toBe('real_adapter')
+    expect(deriv?.platform).toBe('deriv_api')
   })
 })

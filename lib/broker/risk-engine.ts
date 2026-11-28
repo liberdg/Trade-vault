@@ -139,7 +139,7 @@ export function calculateBrokerRisk(input: BrokerRiskInputs): BrokerRiskResult {
         errors.push('Normalized volume would exceed the requested risk. Order blocked.')
         lots = units = estimatedLoss = null
       }
-      if (input.takeProfit !== undefined && isPositiveFinite(input.takeProfit)) {
+      if (lots !== null && input.takeProfit !== undefined && isPositiveFinite(input.takeProfit)) {
         const rewardDistance = Math.abs(input.takeProfit - input.entryPrice)
         estimatedReward = lots * (rewardDistance / specs.tickSize) * specs.tickValuePerLot * specs.quoteToAccountRate
         rewardRisk = estimatedLoss && estimatedLoss > 0 ? estimatedReward / estimatedLoss : null

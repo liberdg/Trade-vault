@@ -107,7 +107,12 @@ export interface UserSettings {
   goals: Goal[]
   dashboardLayout: string[]
   activeBrokerAccount?: { brokerId: string; accountId: string; environment: 'demo' | 'real' }
+  /** Deriv App ID only — API tokens must not be persisted in IndexedDB. */
   derivAppId?: string
+  /**
+   * @deprecated Cleared on settings load/update. Kept only to migrate older IndexedDB rows.
+   * Session tokens stay in React state / sessionStorage, never in durable storage.
+   */
   derivToken?: string
 }
 
@@ -145,6 +150,31 @@ export interface BrokerConnection {
   server?: string
   platform?: 'deriv_api' | 'mt5' | 'mt4' | 'ctrader' | 'binance' | 'bybit' | 'exness_api' | 'exness_mt5' | 'oanda'
   lastSync?: string
+  lastSyncStatus?: 'synchronized' | 'partial' | 'failed'
+  lastSyncError?: string
   createdAt: string
   updatedAt: string
+}
+
+/** Verified broker account snapshot — values must come from a real adapter response. */
+export interface BrokerAccountSnapshot {
+  id: string
+  brokerId: string
+  accountId: string
+  environment: 'demo' | 'real'
+  currency: string
+  balance: number
+  equity?: number
+  credit?: number
+  floatingPnl?: number
+  usedMargin?: number
+  freeMargin?: number
+  marginLevel?: number
+  leverage?: number
+  positionsCount?: number
+  pendingOrdersCount?: number
+  source: string
+  retrievedAt: string
+  incomplete: boolean
+  errors?: string[]
 }

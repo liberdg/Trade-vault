@@ -19,7 +19,7 @@ describe('market intelligence refinements',()=>{
   const gaps=[{direction:'BULLISH' as const,low:99,high:100,index:3,filledPercent:0,invalidated:false}] as FairValueGap[]
   const result=detectTradeSetups(swings,[],blocks,gaps,'BULLISH',99.5,2,100)
   expect(result.some(x=>x.status==='WATCH')).toBe(true)
-  expect(result.every(x=>x.status!=='CONFIRMED')).toBe(true)
+  expect(result.every(x=>String(x.status)!=='CONFIRMED')).toBe(true)
  })
  it('compares recent volatility to a historical baseline',()=>{
   const quiet=Array.from({length:70},(_,i)=>candle(i,100,101,99,100))

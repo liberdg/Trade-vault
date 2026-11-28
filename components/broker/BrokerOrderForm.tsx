@@ -46,11 +46,13 @@ export function BrokerOrderForm({ connected, environment, liveExecutionEnabled }
       })
       const json = await response.json()
       if (!response.ok) throw new Error(json.error || 'OANDA rejected the order')
+      if (!json.verified) throw new Error(json.error || 'Broker did not confirm order acceptance or fill.')
       const risk = json.risk
       const riskMessage = risk?.estimatedLoss !== undefined
         ? ` · Risque estimé: ${Number(risk.estimatedLoss).toFixed(2)} ${json.accountCurrency} (limite ${maxRiskPercent}% equity)`
         : ''
-      setOrderResult(`Ordre envoyé au broker (${json.environment}).${riskMessage}`)
+      const fillInfo = json.fillPrice ? ` · Fill ${json.fillPrice}` : ''
+      setOrderResult(`Broker confirmé: ${String(json.orderStatus).toUpperCase()} (${json.environment})${fillInfo}.${riskMessage}`)
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : 'Order submission failed')
     } finally {

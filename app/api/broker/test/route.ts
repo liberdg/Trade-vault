@@ -133,7 +133,7 @@ async function testDeriv(token: string, appId: string, environment: 'demo' | 're
       const available = accounts.map(account => accountEnvironment(account)).filter(Boolean)
       return {
         status: 'account_environment_mismatch',
-        message: `No ${environment} account was found among the authorized accounts. Available account environments: ${available.length ? [...new Set(available)].join(', ') : 'unknown'}.`,
+        message: `No ${environment} account was found among the authorized accounts. Available account environments: ${available.length ? Array.from(new Set(available)).join(', ') : 'unknown'}.`,
         accounts: accountSummaries,
       }
     }

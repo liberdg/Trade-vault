@@ -3,10 +3,37 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Link2, RefreshCw, Search, ShieldCheck, Trash2, Unlink } from 'lucide-react'
 import { BROKER_CATALOG, BrokerCatalogEntry } from '@/lib/broker/core'
-import { db, getSettings, updateSettings } from '@/lib/db'
+import { db, getSettings, updateSettings, upsertAccountSnapshot } from '@/lib/db'
 import type { BrokerConnection, BrokerConnectionStatus, BrokerConnectionType } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 import { DerivAccountPanel } from './DerivAccountPanel'
+
+const DERIV_SESSION_APP_ID_KEY = 'smrt-deriv-app-id-session'
+const DERIV_SESSION_TOKEN_KEY = 'smrt-deriv-token-session'
+
+function readDerivSession(): { appId: string; token: string } {
+  if (typeof window === 'undefined') return { appId: '', token: '' }
+  try {
+    return {
+      appId: window.sessionStorage.getItem(DERIV_SESSION_APP_ID_KEY) ?? '',
+      token: window.sessionStorage.getItem(DERIV_SESSION_TOKEN_KEY) ?? '',
+    }
+  } catch {
+    return { appId: '', token: '' }
+  }
+}
+
+function writeDerivSession(appId: string, token: string) {
+  if (typeof window === 'undefined') return
+  try {
+    if (appId) window.sessionStorage.setItem(DERIV_SESSION_APP_ID_KEY, appId)
+    else window.sessionStorage.removeItem(DERIV_SESSION_APP_ID_KEY)
+    if (token) window.sessionStorage.setItem(DERIV_SESSION_TOKEN_KEY, token)
+    else window.sessionStorage.removeItem(DERIV_SESSION_TOKEN_KEY)
+  } catch {
+    // sessionStorage unavailable — keep credentials in React state only
+  }
+}
 
 export function BrokerCenter() {
   const [catalog, setCatalog] = useState<BrokerCatalogEntry[]>(BROKER_CATALOG)
@@ -20,16 +47,19 @@ export function BrokerCenter() {
   const [derivAccounts, setDerivAccounts] = useState<Array<{ accountId: string; environment: 'demo' | 'real'; currency?: string; accountType?: string }>>([])
   const [selectedDerivAccountId, setSelectedDerivAccountId] = useState('')
   const [testing, setTesting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [testResult, setTestResult] = useState<{ status: string; message: string; accountId?: string } | null>(null)
   const [connections, setConnections] = useState<BrokerConnection[]>([])
   const [activeAccount, setActiveAccount] = useState<{ brokerId: string; accountId: string; environment: 'demo' | 'real' } | null>(null)
   const [closeReport, setCloseReport] = useState('')
+  const [syncReport, setSyncReport] = useState('')
 
   useEffect(() => {
     db.brokerConnections.toArray().then(setConnections)
+    const session = readDerivSession()
     getSettings().then(settings => {
-      setDerivAppId(settings.derivAppId ?? '')
-      setDerivToken(settings.derivToken ?? '')
+      setDerivAppId(session.appId || settings.derivAppId || '')
+      setDerivToken(session.token)
       const active = settings.activeBrokerAccount ?? null
       setActiveAccount(active)
       if (active) {
@@ -125,7 +155,12 @@ export function BrokerCenter() {
         }
         await db.brokerConnections.put(connection)
         const nextActive = { brokerId: connection.brokerId, accountId: connection.accountId!, environment: connection.environment }
-        await updateSettings({ activeBrokerAccount: nextActive, ...(selected.id === 'deriv' ? { derivAppId: derivAppId.trim(), derivToken: derivToken.trim() } : {}) })
+        // Persist App ID only. Tokens stay in sessionStorage / React state — never IndexedDB.
+        if (selected.id === 'deriv') writeDerivSession(derivAppId.trim(), derivToken.trim())
+        await updateSettings({
+          activeBrokerAccount: nextActive,
+          ...(selected.id === 'deriv' ? { derivAppId: derivAppId.trim(), derivToken: undefined } : {}),
+        })
         setActiveAccount(nextActive)
         setConnections(await db.brokerConnections.toArray())
       }
@@ -156,11 +191,129 @@ export function BrokerCenter() {
     setConnections(await db.brokerConnections.toArray())
   }
 
+  const synchronizeConnection = async (connection: BrokerConnection) => {
+    if (!connection.accountId) return
+    setSyncing(true)
+    setSyncReport('')
+    try {
+      if (connection.brokerId === 'deriv') {
+        if (!derivAppId.trim() || !derivToken.trim()) {
+          setSyncReport('Deriv sync requires App ID and Personal Access Token for this browser session.')
+          return
+        }
+        const response = await fetch('/api/broker/deriv/account-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appId: derivAppId.trim(),
+            token: derivToken.trim(),
+            accountId: connection.accountId,
+            environment: connection.environment,
+          }),
+        })
+        const result = await response.json()
+        if (!response.ok) {
+          const failed = { ...connection, status: 'synchronization_error' as const, lastSyncStatus: 'failed' as const, lastSyncError: result.error || 'Deriv sync failed', updatedAt: new Date().toISOString() }
+          await db.brokerConnections.put(failed)
+          setConnections(await db.brokerConnections.toArray())
+          setSyncReport(result.error || 'Deriv synchronization failed.')
+          return
+        }
+        await upsertAccountSnapshot({
+          id: `${connection.brokerId}:${connection.accountId}:${connection.environment}`,
+          brokerId: connection.brokerId,
+          accountId: connection.accountId,
+          environment: connection.environment,
+          currency: String(result.currency),
+          balance: Number(result.balance),
+          positionsCount: typeof result.positionsCount === 'number' ? result.positionsCount : undefined,
+          source: 'deriv.otp.websocket',
+          retrievedAt: result.retrievedAt || new Date().toISOString(),
+          incomplete: false,
+        })
+        const refreshed = {
+          ...connection,
+          status: 'connected' as const,
+          lastSync: result.retrievedAt || new Date().toISOString(),
+          lastSyncStatus: 'synchronized' as const,
+          lastSyncError: undefined,
+          updatedAt: new Date().toISOString(),
+        }
+        await db.brokerConnections.put(refreshed)
+        setConnections(await db.brokerConnections.toArray())
+        setSyncReport(`Deriv synchronized · balance ${result.balance} ${result.currency} · positions ${result.positionsCount ?? 0}`)
+        return
+      }
+
+      const response = await fetch('/api/broker/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brokerId: connection.brokerId,
+          accountId: connection.accountId,
+          environment: connection.environment,
+        }),
+      })
+      const result = await response.json()
+      if (result.status === 'failed' || !result.balance) {
+        const failed = {
+          ...connection,
+          status: 'synchronization_error' as const,
+          lastSyncStatus: 'failed' as const,
+          lastSyncError: Array.isArray(result.errors) ? result.errors.join(' ') : 'Synchronization failed',
+          updatedAt: new Date().toISOString(),
+        }
+        await db.brokerConnections.put(failed)
+        setConnections(await db.brokerConnections.toArray())
+        setSyncReport(failed.lastSyncError || 'Synchronization failed.')
+        return
+      }
+      await upsertAccountSnapshot({
+        id: `${connection.brokerId}:${connection.accountId}:${connection.environment}`,
+        brokerId: connection.brokerId,
+        accountId: connection.accountId,
+        environment: connection.environment,
+        currency: result.balance.currency,
+        balance: result.balance.balance,
+        equity: result.balance.equity,
+        floatingPnl: result.balance.floatingPnl,
+        usedMargin: result.balance.usedMargin,
+        freeMargin: result.balance.freeMargin,
+        positionsCount: Array.isArray(result.positions) ? result.positions.length : undefined,
+        pendingOrdersCount: Array.isArray(result.orders) ? result.orders.length : undefined,
+        source: result.balance.source,
+        retrievedAt: result.synchronizedAt,
+        incomplete: !!result.incomplete,
+        errors: result.errors,
+      })
+      const refreshed = {
+        ...connection,
+        status: 'connected' as const,
+        lastSync: result.synchronizedAt,
+        lastSyncStatus: result.status as 'synchronized' | 'partial',
+        lastSyncError: result.errors?.length ? result.errors.join(' ') : undefined,
+        updatedAt: new Date().toISOString(),
+      }
+      await db.brokerConnections.put(refreshed)
+      setConnections(await db.brokerConnections.toArray())
+      setSyncReport(`${String(result.status).toUpperCase()} · balance ${result.balance.balance} ${result.balance.currency}${result.balance.equity != null ? ` · equity ${result.balance.equity}` : ''}`)
+    } catch (error) {
+      setSyncReport(error instanceof Error ? error.message : 'Synchronization failed.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const reconnectConnection = async (connection: BrokerConnection) => {
     if (connection.brokerId === 'deriv') {
       const deriv = BROKER_CATALOG.find(entry => entry.id === 'deriv')
       if (deriv) selectBroker(deriv)
-      setTestResult({ status: 'credentials_required', message: derivAppId.trim() && derivToken.trim() ? 'Stored Deriv credentials are available. Use Test & connect to verify this account.' : 'Saved Deriv credentials are missing. Enter App ID and Personal Access Token, then use Test & connect.' })
+      setTestResult({
+        status: 'credentials_required',
+        message: derivAppId.trim() && derivToken.trim()
+          ? 'Session Deriv credentials are available. Use Test & connect to verify this account.'
+          : 'Deriv credentials are missing for this browser session. Enter App ID and Personal Access Token, then use Test & connect.',
+      })
       return
     }
     setTesting(true)
@@ -196,15 +349,24 @@ export function BrokerCenter() {
 
   const closeAllPositions = async () => {
     setCloseReport('')
-    if (!confirm('Close all open positions on the selected accounts?')) return
+    if (!activeAccount) {
+      setCloseReport('Select an active broker account before close-all.')
+      return
+    }
+    if (!confirm(`Close ALL open positions on ${activeAccount.brokerId.toUpperCase()} account ${activeAccount.accountId} (${activeAccount.environment})?`)) return
     try {
       const response = await fetch('/api/broker/close-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountIds: connections.filter(connection => connection.status === 'connected').map(connection => connection.accountId || connection.id) }),
+        body: JSON.stringify({
+          confirm: true,
+          brokerId: activeAccount.brokerId,
+          accountId: activeAccount.accountId,
+          accountIds: [activeAccount.accountId],
+        }),
       })
       const result = await response.json()
-      setCloseReport(`${response.status === 501 ? 'NOT SUPPORTED' : 'BLOCKED'} — ${result.message}`)
+      setCloseReport(`${String(result.status || 'error').toUpperCase()} — ${result.message}`)
     } catch (error) {
       setCloseReport(error instanceof Error ? error.message : 'Close-all request failed.')
     }
@@ -292,12 +454,37 @@ export function BrokerCenter() {
           {selected.id === 'deriv' && (
             <div className="mt-4 grid gap-3 rounded-lg border border-accent/20 bg-[#090c10] p-4">
               <Field label="Deriv App ID">
-                <input value={derivAppId} onChange={event => setDerivAppId(event.target.value)} inputMode="numeric" placeholder="Your Deriv application ID" className="market-input" autoComplete="off" />
+                <input
+                  value={derivAppId}
+                  onChange={event => {
+                    const value = event.target.value
+                    setDerivAppId(value)
+                    writeDerivSession(value.trim(), derivToken.trim())
+                  }}
+                  inputMode="numeric"
+                  placeholder="Your Deriv application ID"
+                  className="market-input"
+                  autoComplete="off"
+                />
               </Field>
               <Field label="Personal Access Token">
-                <input value={derivToken} onChange={event => setDerivToken(event.target.value)} type="password" placeholder="Paste your Deriv API token" className="market-input" autoComplete="off" />
+                <input
+                  value={derivToken}
+                  onChange={event => {
+                    const value = event.target.value
+                    setDerivToken(value)
+                    writeDerivSession(derivAppId.trim(), value.trim())
+                  }}
+                  type="password"
+                  placeholder="Paste your Deriv API token"
+                  className="market-input"
+                  autoComplete="off"
+                />
               </Field>
-              <p className="text-[10px] leading-relaxed text-muted">Token is used only for this request. It is not saved in Trade-Vault local storage or sent to GitHub.</p>
+              <p className="text-[10px] leading-relaxed text-muted">
+                Token stays in this browser session only (sessionStorage). It is never written to IndexedDB, localStorage, or server logs.
+                Prefer server env <span className="font-mono">DERIV_APP_ID</span> / <span className="font-mono">DERIV_API_TOKEN</span> for long-lived server jobs.
+              </p>
             </div>
           )}
 
@@ -343,14 +530,20 @@ export function BrokerCenter() {
                     <div className="text-xs font-semibold text-white">{connection.nickname || connection.brokerName}</div>
                     <div className="mt-1 text-[9px] font-mono uppercase text-muted">{connection.brokerName} · {connection.environment} · {connection.status.replaceAll('_', ' ')}</div>
                     {connection.accountId && <div className="mt-1 text-[10px] font-mono text-muted">Account ID: {connection.accountId}</div>}
+                    {connection.lastSync && <div className="mt-1 text-[10px] font-mono text-muted">Last sync: {new Date(connection.lastSync).toLocaleString()} · {connection.lastSyncStatus || 'n/a'}</div>}
                     {activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment && <div className="mt-2 inline-flex rounded border border-[#2ad39b]/20 bg-[#2ad39b]/10 px-2 py-1 text-[9px] font-mono text-[#2ad39b]">ACTIVE TRADING ACCOUNT</div>}
                   </div>
                   <button onClick={() => removeConnection(connection)} className="text-muted hover:text-[#f06a6a]" aria-label="Remove connection"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {connection.status === 'disconnected' && (
                     <button onClick={() => reconnectConnection(connection)} className="flex items-center gap-1.5 rounded-md border border-accent/30 px-2.5 py-1.5 text-[10px] font-mono text-accent hover:bg-accent/10">
                       <RefreshCw className="h-3 w-3" /> Reconnect
+                    </button>
+                  )}
+                  {connection.accountId && (connection.status === 'connected' || connection.status === 'synchronization_error') && (
+                    <button onClick={() => synchronizeConnection(connection)} disabled={syncing} className="flex items-center gap-1.5 rounded-md border border-accent/30 px-2.5 py-1.5 text-[10px] font-mono text-accent hover:bg-accent/10 disabled:opacity-50">
+                      <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} /> Synchronize
                     </button>
                   )}
                   {connection.status === 'connected' && connection.accountId && !(activeAccount?.brokerId === connection.brokerId && activeAccount.accountId === connection.accountId && activeAccount.environment === connection.environment) && <button onClick={() => activateAccount(connection)} className="flex items-center gap-1.5 rounded-md border border-accent/30 px-2.5 py-1.5 text-[10px] font-mono text-accent hover:bg-accent/10">Set active</button>}
@@ -361,6 +554,7 @@ export function BrokerCenter() {
               </div>
             ))}
           </div>
+          {syncReport && <div className="mt-3 rounded-lg border border-border bg-[#090c10] px-3 py-2 text-[11px] text-muted">{syncReport}</div>}
         </aside>
       </div>
 

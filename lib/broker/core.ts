@@ -30,7 +30,7 @@ export interface BrokerCatalogEntry {
 export const BROKER_CATALOG: BrokerCatalogEntry[] = [
   {
     id: 'mt5', name: 'MetaTrader 5', description: 'Broker-terminal platform',
-    platform: 'mt5', connectionTypes: ['mt5_bridge'], capabilities: ['accounts'],
+    platform: 'mt5', connectionTypes: ['mt5_bridge'], capabilities: ['accounts', 'balance', 'equity', 'positions'],
     recommendedPermission: 'read_only', integrationStatus: 'bridge_required',
     credentials: ['Bridge URL', 'Device pairing token'],
     warning: 'Requires a running logged-in MT5 terminal and an authenticated local/EA bridge. Web-only browser access cannot control MT5 directly.',
@@ -44,7 +44,7 @@ export const BROKER_CATALOG: BrokerCatalogEntry[] = [
   },
   {
     id: 'exness', name: 'Exness', description: 'Eligible Exness API or MT5 bridge',
-    platform: 'exness_api', connectionTypes: ['official_api','mt5_bridge'], capabilities: ['accounts'],
+    platform: 'exness_api', connectionTypes: ['official_api','mt5_bridge'], capabilities: ['accounts', 'balance', 'equity', 'positions'],
     recommendedPermission: 'read_only', integrationStatus: 'bridge_required',
     credentials: ['Integration method'],
     warning: 'Standard Exness MT accounts cannot be assumed eligible for the Exness API. An authenticated MT5 bridge is the appropriate alternative.',
@@ -65,7 +65,7 @@ export const BROKER_CATALOG: BrokerCatalogEntry[] = [
   },
   {
     id: 'mt4', name: 'MetaTrader 4', description: 'Legacy broker-terminal platform',
-    platform: 'mt4', connectionTypes: ['mt4_bridge'], capabilities: ['accounts'],
+    platform: 'mt4', connectionTypes: ['mt4_bridge'], capabilities: ['accounts', 'balance', 'equity', 'positions'],
     recommendedPermission: 'read_only', integrationStatus: 'bridge_required',
     credentials: ['Bridge URL', 'Device pairing token'],
     warning: 'Requires a dedicated authenticated terminal bridge. A cloud-only MT4 password connection is not supported.',
@@ -79,9 +79,10 @@ export const BROKER_CATALOG: BrokerCatalogEntry[] = [
   },
   {
     id: 'oanda', name: 'OANDA', description: 'Practice and live v20 account',
-    platform: 'oanda', connectionTypes: ['official_api'], capabilities: ['accounts','balance'],
+    platform: 'oanda', connectionTypes: ['official_api'],
+    capabilities: ['accounts', 'balance', 'equity', 'positions', 'pending_orders', 'place_order', 'close_position'],
     recommendedPermission: 'read_only', integrationStatus: 'real_adapter',
     credentials: ['API token', 'Account ID'],
-    warning: 'Currently verified API access is limited to account-summary retrieval (balance/currency). Positions, history and execution are not implemented in this connector yet.',
+    warning: 'OANDA v20 practice/live uses server-only credentials. Synchronization covers summary, open positions and pending orders. Close-all and live execution require explicit confirmation; live also requires OANDA_ALLOW_LIVE=true.',
   },
 ]

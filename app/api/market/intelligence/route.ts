@@ -25,14 +25,14 @@ export async function GET(request:NextRequest){
  if(!kinds.includes(kindValue as MarketKind))return NextResponse.json({error:'Unsupported market kind'},{status:400})
  const requested=request.nextUrl.searchParams.get('timeframes')
  const timeframes=requested?requested.split(',').map(x=>x.trim()).filter(Boolean):DEFAULT_TIMEFRAMES
- const unique=[...new Set(timeframes)]
+ const unique=Array.from(new Set(timeframes))
  if(!unique.length||unique.length>6||unique.some(tf=>!ALLOWED_TIMEFRAMES.has(tf)))return NextResponse.json({error:'Request 1 to 6 supported timeframes.'},{status:400})
  const results=await Promise.all(unique.map(async timeframe=>{
   try{const market=await loadCandles(symbol,kindValue as MarketKind,timeframe);return {timeframe,provider:market.provider,retrievedAt:new Date().toISOString(),candleCount:market.candles.length,analysis:runMarketIntelligence(symbol,timeframe,market.candles)}}
-  catch(error){return {timeframe,status:'DATA_UNAVAILABLE' as const,error:error instanceof Error?error.message:'Provider error'}}
+  catch(error){return {timeframe,status:'DATA_UNAVAILABLE' as const,error:error instanceof Error?error.message:'Provider error',analysis:undefined}}
  }))
- const successful=results.filter(r=>'analysis' in r)
- const structures=successful.map(r=>r.analysis.core?.structure).filter(Boolean)
+ const successful=results.filter(r=>r.analysis !== undefined)
+ const structures=successful.map(r=>r.analysis?.core?.structure).filter(Boolean)
  const bullish=structures.includes('BULLISH'),bearish=structures.includes('BEARISH')
  const alignment=structures.length>0&&structures.every(s=>s===structures[0]&&s!=='RANGE'&&s!=='UNCONFIRMED')?String(structures[0]):bullish&&bearish?'CONFLICTING':'MIXED_OR_UNCONFIRMED'
  return NextResponse.json({symbol,kind:kindValue,timeframes:results,alignment,analyzedAt:new Date().toISOString(),availableTimeframes:successful.length,requestedTimeframes:unique.length})
